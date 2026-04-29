@@ -1,5 +1,17 @@
 @import 'tailwindcss';
 
+:root {
+  --color-main: #ff6464;
+  --color-main-ui: #ff4040;
+  --color-light: #ffcece;
+  --color-main-bg: #fffdfd;
+  --color-muted: #e4aeae;
+  --color-lighter: #fff4f4;
+  --color-gray: #8391a1;
+  --color-medium: #ff7777;
+  --color-lightest: #fffbfb;
+}
+
 @layer base {
   button {
     @apply cursor-pointer;
