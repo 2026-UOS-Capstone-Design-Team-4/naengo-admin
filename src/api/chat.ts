@@ -1,6 +1,6 @@
 import { Recipe } from '@/components/RecipeCard';
 
-const BASE_URL = 'http://localhost:8000/api/v1/chat';
+const BASE_URL = `${import.meta.env.VITE_API_URL ?? 'http://localhost:8000'}/api/v1/chat`;
 
 export interface ChatRoom {
   room_id: number;
