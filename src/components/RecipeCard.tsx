@@ -28,6 +28,9 @@ export interface Recipe {
   is_active?: boolean;
   author_type?: string;
   created_at?: string;
+  status?: 'pending' | 'approved' | 'rejected';
+  submitted_by?: string;
+  reject_reason?: string;
 }
 
 const DIFFICULTY_LABEL: Record<string, string> = {

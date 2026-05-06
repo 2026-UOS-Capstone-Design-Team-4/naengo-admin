@@ -2,6 +2,7 @@ import { NavLink, Outlet } from 'react-router';
 
 const NAV_ITEMS = [
   { to: '/', label: '💬 채팅' },
+  { to: '/recipes', label: '📋 레시피 심사' },
   { to: '/admin', label: '⚙️ 관리' },
 ];
 
