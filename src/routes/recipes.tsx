@@ -70,6 +70,7 @@ function RecipeApprovalCard({
       servings: recipe.servings,
       calories: recipe.calories,
       difficulty: recipe.difficulty,
+      category: recipe.category,
       tips: recipe.tips,
     });
     setEditing(true);
@@ -241,6 +242,23 @@ function RecipeApprovalCard({
                   }
                 />
                 kcal
+              </label>
+              <label className="flex items-center gap-0.5 text-xs">
+                <input
+                  type="text"
+                  className="w-24 rounded border border-(--color-light) px-1 py-0.5 text-xs focus:outline-none"
+                  placeholder="카테고리"
+                  value={(draft.category ?? []).join(', ')}
+                  onChange={e =>
+                    setDraft(d => ({
+                      ...d,
+                      category: e.target.value
+                        .split(',')
+                        .map(category => category.trim())
+                        .filter(Boolean),
+                    }))
+                  }
+                />
               </label>
             </>
           ) : (
