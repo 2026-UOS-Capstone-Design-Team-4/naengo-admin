@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 
 import {
   approvePendingRecipe,
+  approvePendingRecipeWithData,
   getMissingFieldLabels,
   getPendingRecipes,
   PendingRecipeUpdatePayload,
@@ -16,6 +17,30 @@ const DIFFICULTY_LABEL: Record<string, string> = {
   normal: '보통',
   hard: '어려움',
 };
+
+const INGREDIENT_UNITS = [
+  '큰술',
+  '작은술',
+  '스푼',
+  '꼬집',
+  '컵',
+  '공기',
+  '봉지',
+  '봉',
+  '팩',
+  '캔',
+  '개',
+  '쪽',
+  '장',
+  '줄기',
+  '줌',
+  '알',
+  '마리',
+  'g',
+  'kg',
+  'ml',
+  'L',
+];
 
 function getYoutubeThumbnail(url: string): string | null {
   const match = url.match(
@@ -33,9 +58,114 @@ function extractErrorMessage(error: unknown, fallback: string): string {
   return fallback;
 }
 
+function parseIngredientsRaw(ingredientsRaw: string | null | undefined) {
+  return (ingredientsRaw ?? '')
+    .split(/\n|,/)
+    .map(line => line.replace(/^[-*•\d.)\s]+/, '').trim())
+    .filter(Boolean)
+    .map(line => {
+      const tokens = line.split(/\s+/);
+      const amountWithUnitPattern = new RegExp(
+        `^(\\d+([./]\\d+)?)(${INGREDIENT_UNITS.join('|')})$`,
+      );
+      const amountIndex = tokens.findIndex(token => {
+        return (
+          /^(\d+([./]\d+)?|약간|조금|적당량)$/.test(token) ||
+          amountWithUnitPattern.test(token)
+        );
+      });
+      const amountToken = amountIndex >= 0 ? tokens[amountIndex] : '';
+      const attachedAmount = amountToken.match(amountWithUnitPattern);
+      const unitIndex =
+        amountIndex >= 0 &&
+        INGREDIENT_UNITS.includes(tokens[amountIndex + 1] ?? '')
+          ? amountIndex + 1
+          : -1;
+
+      if (amountIndex > 0) {
+        return {
+          name: tokens.slice(0, amountIndex).join(' '),
+          amount: attachedAmount?.[1] ?? amountToken,
+          unit: attachedAmount?.[3] ?? (unitIndex > 0 ? tokens[unitIndex] : '적당량'),
+          type: 'main',
+          note: unitIndex > 0 ? tokens.slice(unitIndex + 1).join(' ') : '',
+        };
+      }
+
+      return {
+        name: line,
+        amount: '적당량',
+        unit: '적당량',
+        type: 'main',
+        note: null,
+      };
+    });
+}
+
+function readTextCandidate(
+  recipe: PendingRecipe,
+  keys: string[],
+): string | string[] | null {
+  for (const key of keys) {
+    const value = recipe[key];
+    if (typeof value === 'string' && value.trim()) return value;
+    if (Array.isArray(value) && value.length > 0) {
+      return value.map(item =>
+        typeof item === 'string' ? item : JSON.stringify(item),
+      );
+    }
+  }
+  return null;
+}
+
+function normalizeInstructionSteps(
+  instructions: string[] | string | null | undefined,
+) {
+  const lines = Array.isArray(instructions)
+    ? instructions
+    : (instructions ?? '').split('\n');
+
+  return lines
+    .map(step => step.replace(/^[-*•\d.)\s]+/, '').trim())
+    .filter(Boolean);
+}
+
+function getRecipeInstructionSource(recipe: PendingRecipe) {
+  return readTextCandidate(recipe, [
+    'instructions',
+    'instruction',
+    'cooking_steps',
+    'cooking_step',
+    'steps',
+    'recipe_steps',
+    'recipeSteps',
+    'content',
+  ]);
+}
+
+function normalizeRecipeDraft(
+  draft: PendingRecipeUpdatePayload,
+): PendingRecipeUpdatePayload {
+  const ingredientsRaw = draft.ingredients_raw?.trim() ?? '';
+  const instructions = normalizeInstructionSteps(draft.instructions);
+
+  return {
+    ...draft,
+    ingredients_raw: ingredientsRaw || null,
+    ingredients: ingredientsRaw
+      ? parseIngredientsRaw(ingredientsRaw)
+      : (draft.ingredients ?? null),
+    instructions: instructions.length > 0 ? instructions : null,
+    content: instructions.length > 0 ? instructions.join('\n') : draft.content,
+  };
+}
+
 interface CardProps {
   recipe: PendingRecipe;
-  onApprove: (id: number) => Promise<void>;
+  onApprove: (
+    id: number,
+    data?: PendingRecipeUpdatePayload,
+  ) => Promise<void>;
   onReject: (id: number, reason: string) => Promise<void>;
   onUpdate: (id: number, data: PendingRecipeUpdatePayload) => Promise<void>;
 }
@@ -59,13 +189,17 @@ function RecipeApprovalCard({
 
   const missingLabels = getMissingFieldLabels(recipe);
   const canApprove = missingLabels.length === 0 && !submitting;
+  const instructionSource = getRecipeInstructionSource(recipe);
+  const visibleInstructions = normalizeInstructionSteps(instructionSource);
 
   function startEdit() {
     setDraft({
       title: recipe.title,
+      content: recipe.content,
       description: recipe.description,
+      ingredients: recipe.ingredients,
       ingredients_raw: recipe.ingredients_raw,
-      instructions: recipe.instructions,
+      instructions: visibleInstructions,
       cooking_time: recipe.cooking_time,
       servings: recipe.servings,
       calories: recipe.calories,
@@ -84,7 +218,7 @@ function RecipeApprovalCard({
   async function saveEdit() {
     setSubmitting(true);
     try {
-      await onUpdate(recipe.pending_recipe_id, draft);
+      await onUpdate(recipe.pending_recipe_id, normalizeRecipeDraft(draft));
       setEditing(false);
       setDraft({});
     } finally {
@@ -96,7 +230,26 @@ function RecipeApprovalCard({
     if (!canApprove) return;
     setSubmitting(true);
     try {
-      await onApprove(recipe.pending_recipe_id);
+      await onApprove(
+        recipe.pending_recipe_id,
+        normalizeRecipeDraft({
+          title: recipe.title,
+          content: recipe.content,
+          description: recipe.description,
+          ingredients: recipe.ingredients,
+          instructions: visibleInstructions,
+          ingredients_raw: recipe.ingredients_raw,
+          servings: recipe.servings,
+          cooking_time: recipe.cooking_time,
+          calories: recipe.calories,
+          difficulty: recipe.difficulty,
+          category: recipe.category,
+          tags: recipe.tags,
+          tips: recipe.tips,
+          video_url: recipe.video_url,
+          image_url: recipe.image_url,
+        }),
+      );
     } finally {
       setSubmitting(false);
     }
@@ -340,11 +493,19 @@ function RecipeApprovalCard({
                 placeholder="한 줄에 한 단계씩"
               />
             ) : (
-              <ol className="list-decimal space-y-0.5 pl-4 text-xs text-(--color-gray)">
-                {(recipe.instructions ?? []).map((step, i) => (
-                  <li key={i}>{step}</li>
-                ))}
-              </ol>
+              <>
+                {visibleInstructions.length > 0 ? (
+                  <ol className="list-decimal space-y-0.5 pl-4 text-xs text-(--color-gray)">
+                    {visibleInstructions.map((step, i) => (
+                      <li key={i}>{step}</li>
+                    ))}
+                  </ol>
+                ) : (
+                  <p className="text-xs text-(--color-muted)">
+                    조리 순서가 없습니다.
+                  </p>
+                )}
+              </>
             )}
           </div>
         </div>
@@ -451,10 +612,12 @@ export default function RecipesPage() {
     setRecipes(prev => prev.filter(r => r.pending_recipe_id !== id));
   }
 
-  async function handleApprove(id: number) {
+  async function handleApprove(id: number, data?: PendingRecipeUpdatePayload) {
     setErrorMessage(null);
     try {
-      await approvePendingRecipe(id);
+      await (data
+        ? approvePendingRecipeWithData(id, data)
+        : approvePendingRecipe(id));
       removeFromList(id);
     } catch (error) {
       // 400 = 필수 필드 누락, 그 외는 일반 실패

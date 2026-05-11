@@ -22,6 +22,7 @@ export async function getPendingRecipes(): Promise<PendingRecipe[]> {
 
 
 export interface PendingRecipeUpdatePayload {
+  [key: string]: unknown;
   title?: string | null;
   content?: string | null;
   description?: string | null;
@@ -56,6 +57,13 @@ export async function approvePendingRecipe(id: number): Promise<PendingRecipe> {
   return patchPendingRecipe(id, { status: 'APPROVED' });
 }
 
+export async function approvePendingRecipeWithData(
+  id: number,
+  payload: PendingRecipeUpdatePayload,
+): Promise<PendingRecipe> {
+  return patchPendingRecipe(id, { ...payload, status: 'APPROVED' });
+}
+
 export async function rejectPendingRecipe(
   id: number,
   reason: string,
@@ -79,7 +87,6 @@ export async function updatePendingRecipe(
 export const REQUIRED_FIELDS_FOR_APPROVE = [
   'title',
   'description',
-  'ingredients',
   'ingredients_raw',
   'instructions',
   'servings',
@@ -93,7 +100,6 @@ export type ApproveRequiredField = (typeof REQUIRED_FIELDS_FOR_APPROVE)[number];
 const FIELD_LABEL: Record<ApproveRequiredField, string> = {
   title: '제목',
   description: '설명',
-  ingredients: '재료 (구조화)',
   ingredients_raw: '재료 원문',
   instructions: '조리 순서',
   servings: '인분',
@@ -109,14 +115,35 @@ function isEmpty(value: unknown): boolean {
   return false;
 }
 
+const INSTRUCTION_FIELD_CANDIDATES = [
+  'instructions',
+  'instruction',
+  'cooking_steps',
+  'cooking_step',
+  'steps',
+  'recipe_steps',
+  'recipeSteps',
+  'content',
+];
+
 export function getMissingFieldsForApprove(
-  recipe: Pick<PendingRecipe, ApproveRequiredField>,
+  recipe: Pick<PendingRecipe, ApproveRequiredField | 'content'>,
 ): ApproveRequiredField[] {
-  return REQUIRED_FIELDS_FOR_APPROVE.filter(field => isEmpty(recipe[field]));
+  return REQUIRED_FIELDS_FOR_APPROVE.filter(field => {
+    if (
+      field === 'instructions' &&
+      INSTRUCTION_FIELD_CANDIDATES.some(
+        key => !isEmpty((recipe as Record<string, unknown>)[key]),
+      )
+    ) {
+      return false;
+    }
+    return isEmpty(recipe[field]);
+  });
 }
 
 export function getMissingFieldLabels(
-  recipe: Pick<PendingRecipe, ApproveRequiredField>,
+  recipe: Pick<PendingRecipe, ApproveRequiredField | 'content'>,
 ): string[] {
   return getMissingFieldsForApprove(recipe).map(f => FIELD_LABEL[f]);
 }
