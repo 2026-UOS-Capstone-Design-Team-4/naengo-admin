@@ -40,7 +40,6 @@ export interface Recipe {
 export type PendingRecipeStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
 
 export interface PendingRecipe {
-  [key: string]: unknown;
   pending_recipe_id: number;
   title: string;
   content: string;

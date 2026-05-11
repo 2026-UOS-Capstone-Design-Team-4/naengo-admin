@@ -9,37 +9,13 @@ import {
   rejectPendingRecipe,
   updatePendingRecipe,
 } from '@/api/recipes';
-import { PendingRecipe } from '@/components/RecipeCard';
+import { IngredientItem, PendingRecipe } from '@/components/RecipeCard';
 
 const DIFFICULTY_LABEL: Record<string, string> = {
   easy: '쉬움',
   normal: '보통',
   hard: '어려움',
 };
-
-const INGREDIENT_UNITS = [
-  '큰술',
-  '작은술',
-  '스푼',
-  '꼬집',
-  '컵',
-  '공기',
-  '봉지',
-  '봉',
-  '팩',
-  '캔',
-  '개',
-  '쪽',
-  '장',
-  '줄기',
-  '줌',
-  '알',
-  '마리',
-  'g',
-  'kg',
-  'ml',
-  'L',
-];
 
 function getYoutubeThumbnail(url: string): string | null {
   const match = url.match(
@@ -57,66 +33,6 @@ function extractErrorMessage(error: unknown, fallback: string): string {
   return fallback;
 }
 
-function parseIngredientsRaw(ingredientsRaw: string | null | undefined) {
-  return (ingredientsRaw ?? '')
-    .split(/\n|,/)
-    .map(line => line.replace(/^[-*•\d.)\s]+/, '').trim())
-    .filter(Boolean)
-    .map(line => {
-      const tokens = line.split(/\s+/);
-      const amountWithUnitPattern = new RegExp(
-        `^(\\d+([./]\\d+)?)(${INGREDIENT_UNITS.join('|')})$`,
-      );
-      const amountIndex = tokens.findIndex(token => {
-        return (
-          /^(\d+([./]\d+)?|약간|조금|적당량)$/.test(token) ||
-          amountWithUnitPattern.test(token)
-        );
-      });
-      const amountToken = amountIndex >= 0 ? tokens[amountIndex] : '';
-      const attachedAmount = amountToken.match(amountWithUnitPattern);
-      const unitIndex =
-        amountIndex >= 0 &&
-        INGREDIENT_UNITS.includes(tokens[amountIndex + 1] ?? '')
-          ? amountIndex + 1
-          : -1;
-
-      if (amountIndex > 0) {
-        return {
-          name: tokens.slice(0, amountIndex).join(' '),
-          amount: attachedAmount?.[1] ?? amountToken,
-          unit: attachedAmount?.[3] ?? (unitIndex > 0 ? tokens[unitIndex] : '적당량'),
-          type: 'main',
-          note: unitIndex > 0 ? tokens.slice(unitIndex + 1).join(' ') : '',
-        };
-      }
-
-      return {
-        name: line,
-        amount: '적당량',
-        unit: '적당량',
-        type: 'main',
-        note: null,
-      };
-    });
-}
-
-function readTextCandidate(
-  recipe: PendingRecipe,
-  keys: string[],
-): string | string[] | null {
-  for (const key of keys) {
-    const value = recipe[key];
-    if (typeof value === 'string' && value.trim()) return value;
-    if (Array.isArray(value) && value.length > 0) {
-      return value.map(item =>
-        typeof item === 'string' ? item : JSON.stringify(item),
-      );
-    }
-  }
-  return null;
-}
-
 function normalizeInstructionSteps(
   instructions: string[] | string | null | undefined,
 ) {
@@ -129,17 +45,47 @@ function normalizeInstructionSteps(
     .filter(Boolean);
 }
 
-function getRecipeInstructionSource(recipe: PendingRecipe) {
-  return readTextCandidate(recipe, [
-    'instructions',
-    'instruction',
-    'cooking_steps',
-    'cooking_step',
-    'steps',
-    'recipe_steps',
-    'recipeSteps',
-    'content',
-  ]);
+function formatIngredients(ingredients: IngredientItem[] | null | undefined) {
+  return (ingredients ?? [])
+    .map(ingredient =>
+      [
+        ingredient.name,
+        ingredient.amount,
+        ingredient.unit,
+        ingredient.type,
+        ingredient.note ?? '',
+      ].join(' / '),
+    )
+    .join('\n');
+}
+
+function parseIngredientsText(text: string): IngredientItem[] | null {
+  const ingredients = text
+    .split('\n')
+    .map(line => line.trim())
+    .filter(Boolean)
+    .map(line => {
+      const [name = '', amount = '', unit = '', type = '', note = ''] = line
+        .split('/')
+        .map(part => part.trim());
+
+      return {
+        name,
+        amount,
+        unit,
+        type,
+        note: note || null,
+      };
+    })
+    .filter(
+      ingredient =>
+        ingredient.name &&
+        ingredient.amount &&
+        ingredient.unit &&
+        ingredient.type,
+    );
+
+  return ingredients.length > 0 ? ingredients : null;
 }
 
 function normalizeRecipeDraft(
@@ -151,11 +97,9 @@ function normalizeRecipeDraft(
   return {
     ...draft,
     ingredients_raw: ingredientsRaw || null,
-    ingredients: ingredientsRaw
-      ? parseIngredientsRaw(ingredientsRaw)
-      : (draft.ingredients ?? null),
+    ingredients: draft.ingredients ?? null,
     instructions: instructions.length > 0 ? instructions : null,
-    content: instructions.length > 0 ? instructions.join('\n') : draft.content,
+    content: draft.content?.trim() || null,
   };
 }
 
@@ -185,8 +129,7 @@ function RecipeApprovalCard({
 
   const missingLabels = getMissingFieldLabels(recipe);
   const canApprove = missingLabels.length === 0 && !submitting;
-  const instructionSource = getRecipeInstructionSource(recipe);
-  const visibleInstructions = normalizeInstructionSteps(instructionSource);
+  const visibleInstructions = normalizeInstructionSteps(recipe.instructions);
 
   function startEdit() {
     setDraft({
@@ -433,7 +376,27 @@ function RecipeApprovalCard({
           {/* 재료 */}
           <div>
             <p className="mb-1 text-xs font-semibold text-(--color-main)">
-              재료
+              제출 본문
+            </p>
+            {editing ? (
+              <textarea
+                className="w-full resize-none rounded-lg border border-(--color-light) px-2 py-1 text-xs focus:border-(--color-main) focus:outline-none"
+                rows={3}
+                value={draft.content ?? ''}
+                onChange={e =>
+                  setDraft(d => ({ ...d, content: e.target.value }))
+                }
+              />
+            ) : (
+              <p className="whitespace-pre-wrap text-xs text-(--color-gray)">
+                {recipe.content}
+              </p>
+            )}
+          </div>
+
+          <div>
+            <p className="mb-1 text-xs font-semibold text-(--color-main)">
+              재료 원문
             </p>
             {editing ? (
               <textarea
@@ -447,6 +410,46 @@ function RecipeApprovalCard({
             ) : (
               <p className="text-xs text-(--color-gray)">
                 {recipe.ingredients_raw}
+              </p>
+            )}
+          </div>
+
+          <div>
+            <p className="mb-1 text-xs font-semibold text-(--color-main)">
+              재료 상세 목록
+            </p>
+            {editing ? (
+              <textarea
+                className="w-full resize-none rounded-lg border border-(--color-light) px-2 py-1 text-xs focus:border-(--color-main) focus:outline-none"
+                rows={3}
+                value={formatIngredients(draft.ingredients)}
+                onChange={e =>
+                  setDraft(d => ({
+                    ...d,
+                    ingredients: parseIngredientsText(e.target.value),
+                  }))
+                }
+                placeholder="재료명 / 양 / 단위 / 종류 / 비고"
+              />
+            ) : recipe.ingredients && recipe.ingredients.length > 0 ? (
+              <div className="space-y-1 text-xs text-(--color-gray)">
+                {recipe.ingredients.map((ingredient, i) => (
+                  <p key={i}>
+                    {[
+                      ingredient.name,
+                      ingredient.amount,
+                      ingredient.unit,
+                      ingredient.type,
+                      ingredient.note,
+                    ]
+                      .filter(Boolean)
+                      .join(' / ')}
+                  </p>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-(--color-muted)">
+                재료 상세 목록이 없습니다.
               </p>
             )}
           </div>
