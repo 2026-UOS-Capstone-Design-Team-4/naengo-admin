@@ -5,9 +5,10 @@ export interface IngredientItem {
   amount: string;
   unit: string;
   type: string;
-  note?: string;
+  note?: string | null;
 }
 
+// 정식 승격된 레시피 (RecipeResponse / RecipeListItemResponse)
 export interface Recipe {
   id: number;
   title: string;
@@ -18,7 +19,7 @@ export interface Recipe {
   servings: number;
   cooking_time: number;
   calories?: number | null;
-  difficulty: string;
+  difficulty: 'easy' | 'normal' | 'hard' | string;
   category: string[];
   tags: string[];
   tips: string[];
@@ -26,11 +27,39 @@ export interface Recipe {
   video_url?: string | null;
   image_url?: string | null;
   is_active?: boolean;
-  author_type?: string;
-  created_at?: string;
-  status?: 'pending' | 'approved' | 'rejected';
-  submitted_by?: string;
-  reject_reason?: string;
+  author_type?: 'ADMIN' | 'USER' | string;
+  created_at?: string | null;
+  // RecipeListItemResponse / /users/me/scraps 응답에만 존재
+  likes_count?: number;
+  scrap_count?: number;
+  is_liked?: boolean;
+  is_scrapped?: boolean;
+}
+
+// 사용자가 제출했지만 아직 승인 대기 중인 레시피 (PendingRecipeResponse)
+export type PendingRecipeStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
+
+export interface PendingRecipe {
+  pending_recipe_id: number;
+  title: string;
+  content: string;
+  description?: string | null;
+  ingredients?: IngredientItem[] | null;
+  ingredients_raw?: string | null;
+  instructions?: string[] | null;
+  servings?: number | null;
+  cooking_time?: number | null;
+  calories?: number | null;
+  difficulty?: 'easy' | 'normal' | 'hard' | null;
+  category?: string[] | null;
+  tags?: string[] | null;
+  tips?: string[] | null;
+  video_url?: string | null;
+  image_url?: string | null;
+  status: PendingRecipeStatus;
+  admin_note?: string | null;
+  reviewed_at?: string | null;
+  created_at: string;
 }
 
 const DIFFICULTY_LABEL: Record<string, string> = {
@@ -63,7 +92,9 @@ export function RecipeCard({ recipe }: { recipe: Recipe }) {
           <span className="font-semibold text-black">{recipe.title}</span>
           <div className="flex gap-2 text-xs text-(--color-muted)">
             {recipe.difficulty && (
-              <span>{DIFFICULTY_LABEL[recipe.difficulty] ?? recipe.difficulty}</span>
+              <span>
+                {DIFFICULTY_LABEL[recipe.difficulty] ?? recipe.difficulty}
+              </span>
             )}
             {recipe.cooking_time && <span>{recipe.cooking_time}분</span>}
             {recipe.servings && <span>{recipe.servings}인분</span>}
@@ -129,7 +160,9 @@ export function RecipeCard({ recipe }: { recipe: Recipe }) {
 
           {recipe.ingredients_raw && (
             <div className="mb-2">
-              <p className="mb-1 font-semibold text-(--color-main)">재료 (원문)</p>
+              <p className="mb-1 font-semibold text-(--color-main)">
+                재료 (원문)
+              </p>
               <p className="text-(--color-gray)">{recipe.ingredients_raw}</p>
             </div>
           )}
@@ -140,9 +173,9 @@ export function RecipeCard({ recipe }: { recipe: Recipe }) {
               <table className="w-full text-xs">
                 <thead>
                   <tr className="text-left text-(--color-gray)">
-                    <th className="pb-1 pr-3">이름</th>
-                    <th className="pb-1 pr-3">양</th>
-                    <th className="pb-1 pr-3">단위</th>
+                    <th className="pr-3 pb-1">이름</th>
+                    <th className="pr-3 pb-1">양</th>
+                    <th className="pr-3 pb-1">단위</th>
                     <th className="pb-1">종류</th>
                   </tr>
                 </thead>
@@ -162,8 +195,10 @@ export function RecipeCard({ recipe }: { recipe: Recipe }) {
 
           {recipe.instructions && recipe.instructions.length > 0 && (
             <div className="mb-3">
-              <p className="mb-1 font-semibold text-(--color-main)">조리 순서</p>
-              <ol className="list-decimal pl-4 space-y-1">
+              <p className="mb-1 font-semibold text-(--color-main)">
+                조리 순서
+              </p>
+              <ol className="list-decimal space-y-1 pl-4">
                 {recipe.instructions.map((step, i) => (
                   <li key={i}>{step}</li>
                 ))}
@@ -174,7 +209,7 @@ export function RecipeCard({ recipe }: { recipe: Recipe }) {
           {recipe.tips && recipe.tips.length > 0 && (
             <div className="mb-3">
               <p className="mb-1 font-semibold text-(--color-main)">조리 팁</p>
-              <ul className="list-disc pl-4 space-y-1 text-(--color-gray)">
+              <ul className="list-disc space-y-1 pl-4 text-(--color-gray)">
                 {recipe.tips.map((tip, i) => (
                   <li key={i}>{tip}</li>
                 ))}
@@ -185,7 +220,9 @@ export function RecipeCard({ recipe }: { recipe: Recipe }) {
           {recipe.content && (
             <div className="mb-3">
               <p className="mb-1 font-semibold text-(--color-main)">본문</p>
-              <p className="whitespace-pre-wrap text-(--color-gray)">{recipe.content}</p>
+              <p className="whitespace-pre-wrap text-(--color-gray)">
+                {recipe.content}
+              </p>
             </div>
           )}
 
