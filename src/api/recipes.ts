@@ -57,13 +57,6 @@ export async function approvePendingRecipe(id: number): Promise<PendingRecipe> {
   return patchPendingRecipe(id, { status: 'APPROVED' });
 }
 
-export async function approvePendingRecipeWithData(
-  id: number,
-  payload: PendingRecipeUpdatePayload,
-): Promise<PendingRecipe> {
-  return patchPendingRecipe(id, { ...payload, status: 'APPROVED' });
-}
-
 export async function rejectPendingRecipe(
   id: number,
   reason: string,

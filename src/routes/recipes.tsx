@@ -3,7 +3,6 @@ import { useEffect, useState } from 'react';
 
 import {
   approvePendingRecipe,
-  approvePendingRecipeWithData,
   getMissingFieldLabels,
   getPendingRecipes,
   PendingRecipeUpdatePayload,
@@ -162,10 +161,7 @@ function normalizeRecipeDraft(
 
 interface CardProps {
   recipe: PendingRecipe;
-  onApprove: (
-    id: number,
-    data?: PendingRecipeUpdatePayload,
-  ) => Promise<void>;
+  onApprove: (id: number) => Promise<void>;
   onReject: (id: number, reason: string) => Promise<void>;
   onUpdate: (id: number, data: PendingRecipeUpdatePayload) => Promise<void>;
 }
@@ -230,26 +226,7 @@ function RecipeApprovalCard({
     if (!canApprove) return;
     setSubmitting(true);
     try {
-      await onApprove(
-        recipe.pending_recipe_id,
-        normalizeRecipeDraft({
-          title: recipe.title,
-          content: recipe.content,
-          description: recipe.description,
-          ingredients: recipe.ingredients,
-          instructions: visibleInstructions,
-          ingredients_raw: recipe.ingredients_raw,
-          servings: recipe.servings,
-          cooking_time: recipe.cooking_time,
-          calories: recipe.calories,
-          difficulty: recipe.difficulty,
-          category: recipe.category,
-          tags: recipe.tags,
-          tips: recipe.tips,
-          video_url: recipe.video_url,
-          image_url: recipe.image_url,
-        }),
-      );
+      await onApprove(recipe.pending_recipe_id);
     } finally {
       setSubmitting(false);
     }
@@ -612,12 +589,10 @@ export default function RecipesPage() {
     setRecipes(prev => prev.filter(r => r.pending_recipe_id !== id));
   }
 
-  async function handleApprove(id: number, data?: PendingRecipeUpdatePayload) {
+  async function handleApprove(id: number) {
     setErrorMessage(null);
     try {
-      await (data
-        ? approvePendingRecipeWithData(id, data)
-        : approvePendingRecipe(id));
+      await approvePendingRecipe(id);
       removeFromList(id);
     } catch (error) {
       // 400 = 필수 필드 누락, 그 외는 일반 실패
