@@ -183,6 +183,7 @@ function RecipeApprovalCard({
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<PendingRecipeUpdatePayload>({});
   const [ingredientsText, setIngredientsText] = useState('');
+  const [categoryInput, setCategoryInput] = useState('');
   const [rejecting, setRejecting] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -201,6 +202,7 @@ function RecipeApprovalCard({
 
   function startEdit() {
     setIngredientsText(formatIngredients(recipe.ingredients));
+    setCategoryInput('');
     setDraft({
       title: recipe.title,
       description: recipe.description,
@@ -220,6 +222,7 @@ function RecipeApprovalCard({
   function cancelEdit() {
     setDraft({});
     setIngredientsText('');
+    setCategoryInput('');
     setEditing(false);
   }
 
@@ -237,6 +240,7 @@ function RecipeApprovalCard({
       setEditing(false);
       setDraft({});
       setIngredientsText('');
+      setCategoryInput('');
     } finally {
       setSubmitting(false);
     }
@@ -268,6 +272,25 @@ function RecipeApprovalCard({
     const draftText = createIngredientsDraftFromRaw(draft.ingredients_raw);
     if (!draftText) return;
     setIngredientsText(draftText);
+  }
+
+  function addCategory(value: string) {
+    const category = value.trim();
+    if (!category) return;
+    setDraft(d => ({
+      ...d,
+      category: [...(d.category ?? []), category].filter(
+        (item, index, items) => items.indexOf(item) === index,
+      ),
+    }));
+    setCategoryInput('');
+  }
+
+  function removeCategory(category: string) {
+    setDraft(d => ({
+      ...d,
+      category: (d.category ?? []).filter(item => item !== category),
+    }));
   }
 
   return (
@@ -341,6 +364,19 @@ function RecipeApprovalCard({
         </div>
 
         {/* 메타 정보 */}
+        {!editing && recipe.category && recipe.category.length > 0 && (
+          <div className="flex flex-wrap gap-1 px-4 pt-1">
+            {recipe.category.map(category => (
+              <span
+                key={category}
+                className="rounded-full bg-red-400 px-2 py-0.5 text-xs font-semibold text-white"
+              >
+                {category}
+              </span>
+            ))}
+          </div>
+        )}
+
         <div className="flex flex-wrap gap-2 px-4 pt-1">
           {editing ? (
             <>
@@ -399,23 +435,40 @@ function RecipeApprovalCard({
                 />
                 kcal
               </label>
-              <label className="flex items-center gap-0.5 text-xs">
+              <div className="flex min-w-0 flex-wrap items-center gap-1">
+                {(draft.category ?? []).map(category => (
+                  <button
+                    key={category}
+                    type="button"
+                    onClick={() => removeCategory(category)}
+                    className="rounded-full bg-red-400 px-2 py-0.5 text-xs font-semibold text-white"
+                    title="클릭하면 삭제"
+                  >
+                    {category}
+                  </button>
+                ))}
                 <input
                   type="text"
                   className="w-24 rounded border border-(--color-light) px-1 py-0.5 text-xs focus:outline-none"
                   placeholder="카테고리"
-                  value={(draft.category ?? []).join(', ')}
-                  onChange={e =>
-                    setDraft(d => ({
-                      ...d,
-                      category: e.target.value
-                        .split(',')
-                        .map(category => category.trim())
-                        .filter(Boolean),
-                    }))
-                  }
+                  value={categoryInput}
+                  onChange={e => {
+                    const value = e.target.value;
+                    if (value.includes(',')) {
+                      value.split(',').forEach(addCategory);
+                    } else {
+                      setCategoryInput(value);
+                    }
+                  }}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      addCategory(categoryInput);
+                    }
+                  }}
+                  onBlur={() => addCategory(categoryInput)}
                 />
-              </label>
+              </div>
             </>
           ) : (
             <div className="flex gap-2 text-xs text-(--color-muted)">
