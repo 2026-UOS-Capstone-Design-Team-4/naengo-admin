@@ -17,6 +17,32 @@ const DIFFICULTY_LABEL: Record<string, string> = {
   hard: '어려움',
 };
 
+const INGREDIENT_UNITS = [
+  '큰술',
+  '작은술',
+  '스푼',
+  '꼬집',
+  '컵',
+  '공기',
+  '봉지',
+  '봉',
+  '팩',
+  '캔',
+  '개',
+  '쪽',
+  '장',
+  '줄기',
+  '줌',
+  '알',
+  '마리',
+  '모',
+  '대',
+  'g',
+  'kg',
+  'ml',
+  'L',
+];
+
 function getYoutubeThumbnail(url: string): string | null {
   const match = url.match(
     /(?:youtube\.com\/(?:watch\?v=|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/,
@@ -88,6 +114,44 @@ function parseIngredientsText(text: string): IngredientItem[] | null {
   return ingredients.length > 0 ? ingredients : null;
 }
 
+function createIngredientsDraftFromRaw(raw: string | null | undefined) {
+  const amountWithUnitPattern = new RegExp(
+    `^(\\d+([./]\\d+)?)(?:\\s*)(${INGREDIENT_UNITS.join('|')})$`,
+    'i',
+  );
+
+  return (raw ?? '')
+    .split(/\n|,/)
+    .map(line => line.replace(/^[-*•\d.)\s]+/, '').trim())
+    .filter(Boolean)
+    .map(line => {
+      const tokens = line.split(/\s+/);
+      const amountIndex = tokens.findIndex(token => {
+        return (
+          /^(\d+([./]\d+)?|약간|조금|적당량)$/.test(token) ||
+          amountWithUnitPattern.test(token)
+        );
+      });
+
+      if (amountIndex <= 0) {
+        return `${line} / 적당량 / 적당량 / 메인`;
+      }
+
+      const amountToken = tokens[amountIndex];
+      const attachedAmount = amountToken.match(amountWithUnitPattern);
+      const nextToken = tokens[amountIndex + 1] ?? '';
+      const hasSeparatedUnit = INGREDIENT_UNITS.includes(nextToken);
+      const name = tokens.slice(0, amountIndex).join(' ');
+      const amount = attachedAmount?.[1] ?? amountToken;
+      const unit = attachedAmount?.[3] ?? (hasSeparatedUnit ? nextToken : '적당량');
+      const noteStartIndex = hasSeparatedUnit ? amountIndex + 2 : amountIndex + 1;
+      const note = tokens.slice(noteStartIndex).join(' ');
+
+      return [name, amount, unit, '메인', note].filter(Boolean).join(' / ');
+    })
+    .join('\n');
+}
+
 function normalizeRecipeDraft(
   draft: PendingRecipeUpdatePayload,
 ): PendingRecipeUpdatePayload {
@@ -130,7 +194,10 @@ function RecipeApprovalCard({
 
   const missingLabels = getMissingFieldLabels(recipe);
   const canApprove = missingLabels.length === 0 && !submitting;
-  const visibleInstructions = normalizeInstructionSteps(recipe.instructions);
+  const visibleInstructions =
+    recipe.instructions && recipe.instructions.length > 0
+      ? normalizeInstructionSteps(recipe.instructions)
+      : normalizeInstructionSteps(recipe.content);
 
   function startEdit() {
     setIngredientsText(formatIngredients(recipe.ingredients));
@@ -195,6 +262,12 @@ function RecipeApprovalCard({
     } finally {
       setSubmitting(false);
     }
+  }
+
+  function handleCreateIngredientsDraft() {
+    const draftText = createIngredientsDraftFromRaw(draft.ingredients_raw);
+    if (!draftText) return;
+    setIngredientsText(draftText);
   }
 
   return (
@@ -383,16 +456,6 @@ function RecipeApprovalCard({
             )}
           </div>
 
-          {/* 재료 */}
-          <div>
-            <p className="mb-1 text-xs font-semibold text-(--color-main)">
-              제출 본문
-            </p>
-            <p className="whitespace-pre-wrap text-xs text-(--color-gray)">
-              {recipe.content}
-            </p>
-          </div>
-
           <div>
             <p className="mb-1 text-xs font-semibold text-(--color-main)">
               재료 원문
@@ -414,9 +477,21 @@ function RecipeApprovalCard({
           </div>
 
           <div>
-            <p className="mb-1 text-xs font-semibold text-(--color-main)">
-              재료 상세 목록
-            </p>
+            <div className="mb-1 flex items-center justify-between gap-2">
+              <p className="text-xs font-semibold text-(--color-main)">
+                재료 상세 목록
+              </p>
+              {editing && (
+                <button
+                  type="button"
+                  onClick={handleCreateIngredientsDraft}
+                  disabled={!draft.ingredients_raw?.trim()}
+                  className="rounded-full border border-(--color-light) px-2 py-0.5 text-xs text-(--color-gray) hover:bg-(--color-lighter) disabled:opacity-40"
+                >
+                  원문으로 초안 생성
+                </button>
+              )}
+            </div>
             {editing ? (
               <textarea
                 className="w-full resize-none rounded-lg border border-(--color-light) px-2 py-1 text-xs focus:border-(--color-main) focus:outline-none"
