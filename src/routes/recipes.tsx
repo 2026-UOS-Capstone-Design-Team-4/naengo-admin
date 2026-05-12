@@ -138,6 +138,7 @@ function RecipeApprovalCard({
       title: recipe.title,
       description: recipe.description,
       ingredients: recipe.ingredients,
+      ingredients_raw: recipe.ingredients_raw,
       instructions: visibleInstructions,
       cooking_time: recipe.cooking_time,
       servings: recipe.servings,
@@ -163,7 +164,6 @@ function RecipeApprovalCard({
         normalizeRecipeDraft({
           ...draft,
           ingredients: parseIngredientsText(ingredientsText),
-          ingredients_raw: recipe.ingredients_raw,
           content: recipe.content,
         }),
       );
@@ -397,9 +397,20 @@ function RecipeApprovalCard({
             <p className="mb-1 text-xs font-semibold text-(--color-main)">
               재료 원문
             </p>
-            <p className="text-xs text-(--color-gray)">
-              {recipe.ingredients_raw}
-            </p>
+            {editing ? (
+              <textarea
+                className="w-full resize-none rounded-lg border border-(--color-light) px-2 py-1 text-xs focus:border-(--color-main) focus:outline-none"
+                rows={3}
+                value={draft.ingredients_raw ?? ''}
+                onChange={e =>
+                  setDraft(d => ({ ...d, ingredients_raw: e.target.value }))
+                }
+              />
+            ) : (
+              <p className="text-xs text-(--color-gray)">
+                {recipe.ingredients_raw}
+              </p>
+            )}
           </div>
 
           <div>
