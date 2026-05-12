@@ -118,6 +118,7 @@ function RecipeApprovalCard({
 }: CardProps) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<PendingRecipeUpdatePayload>({});
+  const [ingredientsText, setIngredientsText] = useState('');
   const [rejecting, setRejecting] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -132,12 +133,11 @@ function RecipeApprovalCard({
   const visibleInstructions = normalizeInstructionSteps(recipe.instructions);
 
   function startEdit() {
+    setIngredientsText(formatIngredients(recipe.ingredients));
     setDraft({
       title: recipe.title,
-      content: recipe.content,
       description: recipe.description,
       ingredients: recipe.ingredients,
-      ingredients_raw: recipe.ingredients_raw,
       instructions: visibleInstructions,
       cooking_time: recipe.cooking_time,
       servings: recipe.servings,
@@ -151,15 +151,25 @@ function RecipeApprovalCard({
 
   function cancelEdit() {
     setDraft({});
+    setIngredientsText('');
     setEditing(false);
   }
 
   async function saveEdit() {
     setSubmitting(true);
     try {
-      await onUpdate(recipe.pending_recipe_id, normalizeRecipeDraft(draft));
+      await onUpdate(
+        recipe.pending_recipe_id,
+        normalizeRecipeDraft({
+          ...draft,
+          ingredients: parseIngredientsText(ingredientsText),
+          ingredients_raw: recipe.ingredients_raw,
+          content: recipe.content,
+        }),
+      );
       setEditing(false);
       setDraft({});
+      setIngredientsText('');
     } finally {
       setSubmitting(false);
     }
@@ -378,40 +388,18 @@ function RecipeApprovalCard({
             <p className="mb-1 text-xs font-semibold text-(--color-main)">
               제출 본문
             </p>
-            {editing ? (
-              <textarea
-                className="w-full resize-none rounded-lg border border-(--color-light) px-2 py-1 text-xs focus:border-(--color-main) focus:outline-none"
-                rows={3}
-                value={draft.content ?? ''}
-                onChange={e =>
-                  setDraft(d => ({ ...d, content: e.target.value }))
-                }
-              />
-            ) : (
-              <p className="whitespace-pre-wrap text-xs text-(--color-gray)">
-                {recipe.content}
-              </p>
-            )}
+            <p className="whitespace-pre-wrap text-xs text-(--color-gray)">
+              {recipe.content}
+            </p>
           </div>
 
           <div>
             <p className="mb-1 text-xs font-semibold text-(--color-main)">
               재료 원문
             </p>
-            {editing ? (
-              <textarea
-                className="w-full resize-none rounded-lg border border-(--color-light) px-2 py-1 text-xs focus:border-(--color-main) focus:outline-none"
-                rows={3}
-                value={draft.ingredients_raw ?? ''}
-                onChange={e =>
-                  setDraft(d => ({ ...d, ingredients_raw: e.target.value }))
-                }
-              />
-            ) : (
-              <p className="text-xs text-(--color-gray)">
-                {recipe.ingredients_raw}
-              </p>
-            )}
+            <p className="text-xs text-(--color-gray)">
+              {recipe.ingredients_raw}
+            </p>
           </div>
 
           <div>
@@ -422,13 +410,8 @@ function RecipeApprovalCard({
               <textarea
                 className="w-full resize-none rounded-lg border border-(--color-light) px-2 py-1 text-xs focus:border-(--color-main) focus:outline-none"
                 rows={3}
-                value={formatIngredients(draft.ingredients)}
-                onChange={e =>
-                  setDraft(d => ({
-                    ...d,
-                    ingredients: parseIngredientsText(e.target.value),
-                  }))
-                }
+                value={ingredientsText}
+                onChange={e => setIngredientsText(e.target.value)}
                 placeholder="재료명 / 양 / 단위 / 종류 / 비고"
               />
             ) : recipe.ingredients && recipe.ingredients.length > 0 ? (
