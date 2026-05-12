@@ -134,7 +134,7 @@ function createIngredientsDraftFromRaw(raw: string | null | undefined) {
       });
 
       if (amountIndex <= 0) {
-        return `${line} / 적당량 / 적당량 / 메인`;
+        return `${line} / 적당량 / 개 / 메인`;
       }
 
       const amountToken = tokens[amountIndex];
@@ -143,7 +143,7 @@ function createIngredientsDraftFromRaw(raw: string | null | undefined) {
       const hasSeparatedUnit = INGREDIENT_UNITS.includes(nextToken);
       const name = tokens.slice(0, amountIndex).join(' ');
       const amount = attachedAmount?.[1] ?? amountToken;
-      const unit = attachedAmount?.[3] ?? (hasSeparatedUnit ? nextToken : '적당량');
+      const unit = attachedAmount?.[3] ?? (hasSeparatedUnit ? nextToken : '개');
       const noteStartIndex = hasSeparatedUnit ? amountIndex + 2 : amountIndex + 1;
       const note = tokens.slice(noteStartIndex).join(' ');
 
