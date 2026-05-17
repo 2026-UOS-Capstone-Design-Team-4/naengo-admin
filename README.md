@@ -51,7 +51,7 @@ npm run format    # Prettier 포맷 적용
 ## 🐳 Docker로 실행
 
 ```bash
-docker-compose up
+docker compose -f docker-compose.dev.yml up
 ```
 
 `localhost:5173`에서 접근할 수 있습니다.
@@ -63,12 +63,15 @@ src/
 ├── api/              # API 호출 함수
 │   ├── client.ts     # axios 인스턴스 (baseURL 설정)
 │   ├── chat.ts       # 채팅 API (SSE 스트림 파싱 포함)
-│   └── recipes.ts    # 레시피 API
+│   ├── recipes.ts    # 레시피 API
+│   └── adminRecipes.ts # 운영 레시피 API
 ├── components/       # 공통 컴포넌트
-│   └── RecipeCard.tsx
+│   ├── RecipeCard.tsx
+│   └── MarkdownText.tsx
 ├── routes/           # 페이지 컴포넌트
 │   ├── chat.tsx      # 채팅 페이지
-│   └── admin.tsx     # 관리 페이지
+│   ├── admin.tsx     # 운영 레시피 관리 페이지
+│   └── recipes.tsx   # 레시피 목록 페이지
 ├── App.tsx           # 레이아웃 (사이드바 + Outlet)
 ├── main.tsx          # 앱 진입점
 └── global.css        # 전역 스타일 (CSS 변수 포함)
@@ -77,4 +80,5 @@ src/
 ## 🖥 페이지
 
 - `/` — AI 채팅 페이지. 재료를 입력하면 레시피를 추천받을 수 있습니다.
-- `/admin` — 관리 페이지. YouTube URL로 등록된 레시피를 조회할 수 있습니다.
+- `/recipes` — 등록된 레시피 목록을 조회할 수 있습니다.
+- `/admin/recipes` — 운영 레시피를 조회하고 원본, 영양, 분류 데이터를 확인할 수 있습니다.

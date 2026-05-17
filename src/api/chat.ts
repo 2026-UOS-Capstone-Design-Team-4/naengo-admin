@@ -1,6 +1,7 @@
 import { Recipe } from '@/components/RecipeCard';
 
 const BASE_URL = `${import.meta.env.VITE_API_URL ?? 'http://localhost:8000'}/api/v1/chat`;
+const ADMIN_BASE_URL = `${import.meta.env.VITE_API_URL ?? 'http://localhost:8000'}/api/v1/admin`;
 
 export interface ChatRoom {
   room_id: number;
@@ -27,11 +28,22 @@ export async function getRoomMessages(roomId: number): Promise<ChatMessage[]> {
   return response.json();
 }
 
+export async function deleteAdminChatRoom(roomId: number): Promise<void> {
+  const response = await fetch(`${ADMIN_BASE_URL}/chat-rooms/${roomId}`, {
+    method: 'DELETE',
+  });
+
+  if (!response.ok) {
+    throw new Error('채팅방을 삭제하지 못했습니다.');
+  }
+}
 
 interface ChatCallbacks {
   onRoom?: (roomId: number) => void;
   onMessage: (chunk: string) => void;
   onRecipes: (recipes: Recipe[]) => void;
+  onDone?: (messageId: number, recipeIds: number[]) => void;
+  onError?: (code: string, message: string) => void;
 }
 
 async function parseStream(
@@ -62,6 +74,15 @@ async function parseStream(
           callbacks.onMessage(JSON.parse(data).content);
         } else if (currentEvent === 'recipes') {
           callbacks.onRecipes(JSON.parse(data));
+        } else if (currentEvent === 'done') {
+          const parsed = JSON.parse(data);
+          callbacks.onDone?.(parsed.message_id, parsed.recipe_ids ?? []);
+        } else if (currentEvent === 'error') {
+          const parsed = JSON.parse(data);
+          callbacks.onError?.(
+            parsed.code ?? 'UNKNOWN',
+            parsed.message ?? '오류가 발생했습니다.',
+          );
         }
         currentEvent = '';
       }

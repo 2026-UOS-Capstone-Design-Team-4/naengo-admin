@@ -1,6 +1,13 @@
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
+
+## 인코딩 주의
+
+- PowerShell 명령 실행할 땐, 항상 PowerShell 7 (pwsh) 써
+- Windows PowerShell 5.1이나 터미널 출력에서는 한글/특수문자가 깨져 보일 수 있으므로, 출력만 보고 파일이 깨졌다고 판단하지 않습니다.
+- 파일을 읽거나 수정할 때는 항상 UTF-8 원문 기준으로 확인하고, 저장도 UTF-8 인코딩을 유지합니다.
+- 깨져 보이는 터미널 출력 내용을 그대로 복사해서 문서나 코드에 반영하지 않습니다.
 
 ## 개발 실행
 

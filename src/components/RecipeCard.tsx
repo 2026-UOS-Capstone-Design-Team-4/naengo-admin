@@ -1,5 +1,12 @@
 import { useState } from 'react';
 
+export interface RecipeStep {
+  step_no: number;
+  title?: string | null;
+  instruction: string;
+  tip?: string | null;
+}
+
 export interface IngredientItem {
   name: string;
   amount: string;
@@ -8,14 +15,30 @@ export interface IngredientItem {
   note?: string | null;
 }
 
-// 정식 승격된 레시피 (RecipeResponse / RecipeListItemResponse)
+export interface RecipeDraftPayload {
+  title?: string | null;
+  description?: string | null;
+  ingredients?: IngredientItem[] | null;
+  ingredients_raw?: string | string[] | null;
+  instructions?: Array<string | RecipeStep> | null;
+  servings?: number | null;
+  cooking_time_minutes?: number | null;
+  kcal_per_serving?: number | null;
+  difficulty?: 'easy' | 'normal' | 'hard' | null;
+  category?: string | string[] | Record<string, unknown> | null;
+  tags?: string | string[] | null;
+  tips?: string | string[] | null;
+  video_url?: string | null;
+  image_url?: string | null;
+}
+
 export interface Recipe {
   id: number;
   title: string;
   description: string;
   ingredients: IngredientItem[];
   ingredients_raw: string;
-  instructions: string[];
+  steps: RecipeStep[];
   servings: number;
   cooking_time: number;
   calories?: number | null;
@@ -23,43 +46,43 @@ export interface Recipe {
   category: string[];
   tags: string[];
   tips: string[];
-  content?: string | null;
+  summary?: string | null;
   video_url?: string | null;
   image_url?: string | null;
   is_active?: boolean;
-  author_type?: 'ADMIN' | 'USER' | string;
+  author_type?: 'ADMIN' | 'USER' | 'SOURCE' | string;
   created_at?: string | null;
-  // RecipeListItemResponse / /users/me/scraps 응답에만 존재
   likes_count?: number;
   scrap_count?: number;
   is_liked?: boolean;
   is_scrapped?: boolean;
 }
 
-// 사용자가 제출했지만 아직 승인 대기 중인 레시피 (PendingRecipeResponse)
 export type PendingRecipeStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
+export type PendingRecipeImportStatus =
+  | 'NOT_IMPORTED'
+  | 'IMPORTED'
+  | 'FAILED';
 
 export interface PendingRecipe {
   pending_recipe_id: number;
+  user_id: number;
   title: string;
-  content: string;
-  description?: string | null;
-  ingredients?: IngredientItem[] | null;
-  ingredients_raw?: string | null;
-  instructions?: string[] | null;
-  servings?: number | null;
-  cooking_time?: number | null;
-  calories?: number | null;
-  difficulty?: 'easy' | 'normal' | 'hard' | null;
-  category?: string[] | null;
-  tags?: string[] | null;
-  tips?: string[] | null;
-  video_url?: string | null;
-  image_url?: string | null;
+  submission_text: string;
+  draft_payload: RecipeDraftPayload;
+  ai_suggested_patch: Partial<RecipeDraftPayload>;
+  validation_errors: Array<{ field: string; message: string }>;
   status: PendingRecipeStatus;
+  import_status: PendingRecipeImportStatus;
+  is_active: boolean;
   admin_note?: string | null;
+  rejection_reason?: string | null;
+  reviewed_by?: number | null;
   reviewed_at?: string | null;
+  imported_recipe_id?: number | null;
+  imported_at?: string | null;
   created_at: string;
+  updated_at: string;
 }
 
 const DIFFICULTY_LABEL: Record<string, string> = {
@@ -77,167 +100,106 @@ function getYoutubeThumbnail(url: string): string | null {
 
 export function RecipeCard({ recipe }: { recipe: Recipe }) {
   const [open, setOpen] = useState(false);
-  const thumbnail = recipe.video_url
+  const coverImage = recipe.video_url
     ? getYoutubeThumbnail(recipe.video_url)
-    : null;
-  const coverImage = thumbnail ?? recipe.image_url ?? null;
+    : recipe.image_url;
 
   return (
-    <div className="mt-2 rounded-2xl border border-(--color-light) bg-(--color-lightest) shadow-sm">
+    <article className="rounded-lg border border-(--color-light) bg-white shadow-sm">
       <button
-        onClick={() => setOpen(prev => !prev)}
-        className="flex w-full items-center justify-between px-4 py-3 text-left"
+        type="button"
+        onClick={() => setOpen(value => !value)}
+        className="flex w-full items-center justify-between gap-4 px-4 py-3 text-left"
       >
-        <div className="flex flex-col gap-0.5">
-          <span className="font-semibold text-black">{recipe.title}</span>
-          <div className="flex gap-2 text-xs text-(--color-muted)">
-            {recipe.difficulty && (
-              <span>
-                {DIFFICULTY_LABEL[recipe.difficulty] ?? recipe.difficulty}
-              </span>
-            )}
-            {recipe.cooking_time && <span>{recipe.cooking_time}분</span>}
-            {recipe.servings && <span>{recipe.servings}인분</span>}
+        <div className="min-w-0">
+          <h3 className="truncate font-semibold text-black">{recipe.title}</h3>
+          <div className="mt-1 flex flex-wrap gap-2 text-xs text-(--color-gray)">
+            <span>
+              {DIFFICULTY_LABEL[recipe.difficulty] ?? recipe.difficulty}
+            </span>
+            <span>{recipe.cooking_time}분</span>
+            <span>{recipe.servings}인분</span>
             {recipe.calories != null && <span>{recipe.calories}kcal</span>}
           </div>
         </div>
-        <span className="text-(--color-muted)">{open ? '▲' : '▼'}</span>
+        <span className="text-sm text-(--color-muted)">
+          {open ? '접기' : '보기'}
+        </span>
       </button>
 
       {open && (
-        <div className="border-t border-(--color-light) px-4 py-3 text-sm text-black">
+        <div className="space-y-4 border-t border-(--color-light) px-4 py-4 text-sm">
           {coverImage && (
-            <a
-              href={recipe.video_url ?? undefined}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="group relative mb-3 block overflow-hidden rounded-xl"
-            >
-              <img
-                src={coverImage}
-                alt={recipe.title}
-                className="w-full object-cover transition-transform duration-200 group-hover:scale-105"
-              />
-              {recipe.video_url && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/0 transition-colors duration-200 group-hover:bg-black/30">
-                  <span className="scale-0 text-5xl text-white drop-shadow-lg transition-transform duration-200 group-hover:scale-100">
-                    ▶
-                  </span>
-                </div>
-              )}
-            </a>
+            <img
+              src={coverImage}
+              alt={recipe.title}
+              className="aspect-video w-full rounded-lg object-cover"
+            />
           )}
 
-          {recipe.description && (
-            <p className="mb-3 text-(--color-gray)">{recipe.description}</p>
-          )}
+          <p className="text-(--color-gray)">{recipe.description}</p>
 
-          {recipe.category && recipe.category.length > 0 && (
-            <div className="mb-2 flex flex-wrap gap-1">
-              {recipe.category.map((c, i) => (
+          {(recipe.category.length > 0 || recipe.tags.length > 0) && (
+            <div className="flex flex-wrap gap-1">
+              {recipe.category.map(item => (
                 <span
-                  key={i}
+                  key={`category-${item}`}
                   className="rounded-full bg-(--color-main) px-2 py-0.5 text-xs text-white"
                 >
-                  {c}
+                  {item}
                 </span>
               ))}
-            </div>
-          )}
-
-          {recipe.tags && recipe.tags.length > 0 && (
-            <div className="mb-3 flex flex-wrap gap-1">
-              {recipe.tags.map((tag, i) => (
+              {recipe.tags.map(item => (
                 <span
-                  key={i}
+                  key={`tag-${item}`}
                   className="rounded-full border border-(--color-light) px-2 py-0.5 text-xs text-(--color-gray)"
                 >
-                  #{tag}
+                  #{item}
                 </span>
               ))}
             </div>
           )}
 
-          {recipe.ingredients_raw && (
-            <div className="mb-2">
-              <p className="mb-1 font-semibold text-(--color-main)">
-                재료 (원문)
-              </p>
-              <p className="text-(--color-gray)">{recipe.ingredients_raw}</p>
-            </div>
-          )}
+          <section>
+            <h4 className="mb-1 font-semibold text-(--color-main)">재료</h4>
+            <p className="text-(--color-gray)">{recipe.ingredients_raw}</p>
+          </section>
 
-          {recipe.ingredients && recipe.ingredients.length > 0 && (
-            <div className="mb-3">
-              <p className="mb-1 font-semibold text-(--color-main)">재료</p>
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="text-left text-(--color-gray)">
-                    <th className="pr-3 pb-1">이름</th>
-                    <th className="pr-3 pb-1">양</th>
-                    <th className="pr-3 pb-1">단위</th>
-                    <th className="pb-1">종류</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {recipe.ingredients.map((ing, i) => (
-                    <tr key={i} className="border-t border-(--color-light)">
-                      <td className="py-1 pr-3">{ing.name}</td>
-                      <td className="py-1 pr-3">{ing.amount}</td>
-                      <td className="py-1 pr-3">{ing.unit}</td>
-                      <td className="py-1">{ing.type}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          {recipe.instructions && recipe.instructions.length > 0 && (
-            <div className="mb-3">
-              <p className="mb-1 font-semibold text-(--color-main)">
+          {recipe.steps.length > 0 && (
+            <section>
+              <h4 className="mb-1 font-semibold text-(--color-main)">
                 조리 순서
-              </p>
-              <ol className="list-decimal space-y-1 pl-4">
-                {recipe.instructions.map((step, i) => (
-                  <li key={i}>{step}</li>
+              </h4>
+              <ol className="list-decimal space-y-2 pl-5 text-(--color-gray)">
+                {recipe.steps.map(step => (
+                  <li key={step.step_no}>
+                    {step.title && (
+                      <span className="font-medium">{step.title} — </span>
+                    )}
+                    {step.instruction}
+                    {step.tip && (
+                      <p className="mt-0.5 text-xs italic text-(--color-muted)">
+                        Tip: {step.tip}
+                      </p>
+                    )}
+                  </li>
                 ))}
               </ol>
-            </div>
-          )}
-
-          {recipe.tips && recipe.tips.length > 0 && (
-            <div className="mb-3">
-              <p className="mb-1 font-semibold text-(--color-main)">조리 팁</p>
-              <ul className="list-disc space-y-1 pl-4 text-(--color-gray)">
-                {recipe.tips.map((tip, i) => (
-                  <li key={i}>{tip}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {recipe.content && (
-            <div className="mb-3">
-              <p className="mb-1 font-semibold text-(--color-main)">본문</p>
-              <p className="whitespace-pre-wrap text-(--color-gray)">
-                {recipe.content}
-              </p>
-            </div>
+            </section>
           )}
 
           {recipe.video_url && (
             <a
               href={recipe.video_url}
               target="_blank"
-              rel="noopener noreferrer"
-              className="text-(--color-main-ui) underline"
+              rel="noreferrer"
+              className="inline-flex text-(--color-main-ui) underline"
             >
-              영상 보기 →
+              원본 영상 보기
             </a>
           )}
         </div>
       )}
-    </div>
+    </article>
   );
 }
