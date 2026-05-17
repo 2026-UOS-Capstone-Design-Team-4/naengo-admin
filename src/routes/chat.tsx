@@ -4,9 +4,11 @@ import {
   chatInRoom,
   type ChatRoom,
   createRoomAndChat,
+  deleteAdminChatRoom,
   getRoomMessages,
   getRooms,
 } from '@/api/chat';
+import { MarkdownText } from '@/components/MarkdownText';
 import { Recipe, RecipeCard } from '@/components/RecipeCard';
 
 interface ChatPart {
@@ -25,6 +27,7 @@ export default function ChatPage() {
   const [image, setImage] = useState<string | null>(null);
   const [history, setHistory] = useState<ChatContent[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [deletingRoomId, setDeletingRoomId] = useState<number | null>(null);
   const [roomId, setRoomId] = useState<number | null>(null);
   const [rooms, setRooms] = useState<ChatRoom[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -64,6 +67,33 @@ export default function ChatPage() {
     setHistory([]);
     setPrompt('');
     setImage(null);
+  };
+
+  const handleDeleteRoom = async (
+    event: React.MouseEvent<HTMLButtonElement>,
+    room: ChatRoom,
+  ) => {
+    event.stopPropagation();
+    if (isLoading || deletingRoomId !== null) return;
+    const confirmed = window.confirm(
+      `"${room.title}" 채팅방을 DB에서 완전히 삭제할까요?`,
+    );
+    if (!confirmed) return;
+
+    setDeletingRoomId(room.room_id);
+    try {
+      await deleteAdminChatRoom(room.room_id);
+      setRooms(prev => prev.filter(item => item.room_id !== room.room_id));
+      if (roomId === room.room_id) {
+        setRoomId(null);
+        setHistory([]);
+      }
+    } catch (error) {
+      console.error(error);
+      alert('채팅방을 삭제하지 못했습니다.');
+    } finally {
+      setDeletingRoomId(null);
+    }
   };
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -131,6 +161,16 @@ export default function ChatPage() {
             return next;
           });
         },
+        onError: (_code: string, message: string) => {
+          setHistory(prev => {
+            const next = [...prev];
+            next[next.length - 1] = {
+              ...next[next.length - 1],
+              parts: [{ text: `오류: ${message}` }],
+            };
+            return next;
+          });
+        },
       };
 
       if (roomId === null) {
@@ -161,20 +201,33 @@ export default function ChatPage() {
         </div>
         <div className="flex-1 overflow-y-auto px-2 pb-2">
           {rooms.map(room => (
-            <button
+            <div
               key={room.room_id}
-              onClick={() => handleSelectRoom(room)}
-              className={`w-full rounded-xl px-3 py-2.5 text-left text-sm transition-colors ${
+              className={`group flex w-full items-center gap-2 rounded-xl pr-2 text-sm transition-colors ${
                 roomId === room.room_id
                   ? 'bg-(--color-light) font-semibold'
                   : 'hover:bg-(--color-lightest)'
               }`}
             >
-              <p className="truncate">{room.title}</p>
-              <p className="mt-0.5 text-xs text-(--color-muted)">
-                {new Date(room.updated_at).toLocaleDateString('ko-KR')}
-              </p>
-            </button>
+              <button
+                type="button"
+                onClick={() => handleSelectRoom(room)}
+                className="min-w-0 flex-1 px-3 py-2.5 text-left"
+              >
+                <span className="block truncate">{room.title}</span>
+                <span className="mt-0.5 block text-xs text-(--color-muted)">
+                  {new Date(room.updated_at).toLocaleDateString('ko-KR')}
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={event => handleDeleteRoom(event, room)}
+                disabled={deletingRoomId === room.room_id}
+                className="shrink-0 rounded-md px-2 py-1 text-xs font-semibold text-red-500 opacity-0 transition-opacity hover:bg-red-50 disabled:text-(--color-muted) group-hover:opacity-100 group-focus-within:opacity-100"
+              >
+                {deletingRoomId === room.room_id ? '삭제 중' : '삭제'}
+              </button>
+            </div>
           ))}
           {rooms.length === 0 && (
             <p className="px-3 py-4 text-center text-xs text-(--color-muted)">
@@ -214,11 +267,15 @@ export default function ChatPage() {
                     className="mb-2 max-h-48 rounded-xl object-cover"
                   />
                 )}
-                {item.parts.map((p, i) => (
-                  <p key={i} className="whitespace-pre-wrap">
-                    {p.text}
-                  </p>
-                ))}
+                {item.parts.map((p, i) =>
+                  item.role === 'model' ? (
+                    <MarkdownText key={i} text={p.text} />
+                  ) : (
+                    <p key={i} className="whitespace-pre-wrap">
+                      {p.text}
+                    </p>
+                  ),
+                )}
               </div>
               {item.recipes && item.recipes.length > 0 && (
                 <div className="mt-2 w-full space-y-2">
