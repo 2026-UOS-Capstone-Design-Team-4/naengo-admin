@@ -1,4 +1,4 @@
-import { createBrowserRouter } from 'react-router';
+import { createBrowserRouter, Navigate } from 'react-router';
 
 import App from '@/App.tsx';
 import AdminPage from '@/routes/admin.tsx';
@@ -10,7 +10,9 @@ export const router = createBrowserRouter([
     element: <App />,
     children: [
       { index: true, element: <ChatPage /> },
-      { path: 'admin', element: <AdminPage /> },
+      { path: 'admin', element: <Navigate to="/admin/recipes" replace /> },
+      { path: 'admin/recipes', element: <AdminPage /> },
+      { path: 'admin/pending-recipes', element: <RecipesPage /> },
       { path: 'recipes', element: <RecipesPage /> },
     ],
   },
