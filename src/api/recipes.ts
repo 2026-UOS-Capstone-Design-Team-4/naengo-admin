@@ -1,45 +1,35 @@
 import {
   PendingRecipe,
   PendingRecipeStatus,
-  Recipe,
+  RecipeDraftPayload,
 } from '@/components/RecipeCard';
 
 import client from './client';
 
-
-export async function getRecipeByVideoUrl(videoUrl: string): Promise<Recipe> {
-  const { data } = await client.get<Recipe>('/admin/recipes', {
-    params: { video_url: videoUrl },
-  });
-  return data;
+export async function getPendingRecipes(
+  status: PendingRecipeStatus | '' = 'PENDING',
+  isActive: boolean | '' = true,
+): Promise<PendingRecipe[]> {
+  const { data } = await client.get<{ items: PendingRecipe[] }>(
+    '/admin/pending-recipes',
+    {
+      params: {
+        ...(status ? { status } : {}),
+        ...(isActive === '' ? {} : { is_active: isActive }),
+        limit: 100,
+      },
+    },
+  );
+  return data.items;
 }
-
-// ── 제출(pending) 레시피 ───────────────────────────────────────
-export async function getPendingRecipes(): Promise<PendingRecipe[]> {
-  const { data } = await client.get<PendingRecipe[]>('/pending-recipes');
-  return data;
-}
-
 
 export interface PendingRecipeUpdatePayload {
-  [key: string]: unknown;
   title?: string | null;
-  content?: string | null;
-  description?: string | null;
-  ingredients?: PendingRecipe['ingredients'];
-  ingredients_raw?: string | null;
-  instructions?: string[] | null;
-  servings?: number | null;
-  cooking_time?: number | null;
-  calories?: number | null;
-  difficulty?: 'easy' | 'normal' | 'hard' | null;
-  category?: string[] | null;
-  tags?: string[] | null;
-  tips?: string[] | null;
-  video_url?: string | null;
-  image_url?: string | null;
+  submission_text?: string | null;
+  draft_payload?: RecipeDraftPayload | null;
   status?: PendingRecipeStatus | null;
   admin_note?: string | null;
+  rejection_reason?: string | null;
 }
 
 async function patchPendingRecipe(
@@ -63,44 +53,56 @@ export async function rejectPendingRecipe(
 ): Promise<PendingRecipe> {
   return patchPendingRecipe(id, {
     status: 'REJECTED',
-    admin_note: reason,
+    rejection_reason: reason,
   });
+}
+
+export async function changePendingRecipeStatus(
+  id: number,
+  status: PendingRecipeStatus,
+  reason?: string,
+): Promise<PendingRecipe> {
+  return patchPendingRecipe(id, {
+    status,
+    rejection_reason: status === 'REJECTED' ? reason || '관리자 거절' : null,
+  });
+}
+
+export async function hardDeletePendingRecipe(id: number): Promise<void> {
+  await client.delete(`/admin/pending-recipes/${id}`);
 }
 
 export async function updatePendingRecipe(
   id: number,
   payload: PendingRecipeUpdatePayload,
 ): Promise<PendingRecipe> {
-  
-  const { status: _ignored, ...safe } = payload;
+  const safe = { ...payload };
+  delete safe.status;
   return patchPendingRecipe(id, safe);
 }
 
-
-export const REQUIRED_FIELDS_FOR_APPROVE = [
-  'title',
+const REQUIRED_DRAFT_FIELDS = [
   'description',
   'ingredients',
   'ingredients_raw',
   'instructions',
   'servings',
-  'cooking_time',
+  'cooking_time_minutes',
   'difficulty',
   'category',
 ] as const;
 
-export type ApproveRequiredField = (typeof REQUIRED_FIELDS_FOR_APPROVE)[number];
+type RequiredDraftField = (typeof REQUIRED_DRAFT_FIELDS)[number];
 
-const FIELD_LABEL: Record<ApproveRequiredField, string> = {
-  title: '제목',
-  description: '설명',
-  ingredients: '재료 상세 목록',
-  ingredients_raw: '재료 원문',
-  instructions: '조리 순서',
-  servings: '인분',
-  cooking_time: '조리시간',
-  difficulty: '난이도',
-  category: '카테고리',
+const DRAFT_FIELD_LABEL: Record<RequiredDraftField, string> = {
+  description: 'description',
+  ingredients: 'ingredients',
+  ingredients_raw: 'ingredients_raw',
+  instructions: 'instructions',
+  servings: 'servings',
+  cooking_time_minutes: 'cooking_time_minutes',
+  difficulty: 'difficulty',
+  category: 'category',
 };
 
 function isEmpty(value: unknown): boolean {
@@ -110,14 +112,9 @@ function isEmpty(value: unknown): boolean {
   return false;
 }
 
-export function getMissingFieldsForApprove(
-  recipe: Pick<PendingRecipe, ApproveRequiredField>,
-): ApproveRequiredField[] {
-  return REQUIRED_FIELDS_FOR_APPROVE.filter(field => isEmpty(recipe[field]));
-}
-
-export function getMissingFieldLabels(
-  recipe: Pick<PendingRecipe, ApproveRequiredField>,
-): string[] {
-  return getMissingFieldsForApprove(recipe).map(f => FIELD_LABEL[f]);
+export function getMissingFieldLabels(recipe: PendingRecipe): string[] {
+  const payload = recipe.draft_payload;
+  return REQUIRED_DRAFT_FIELDS.filter(field =>
+    isEmpty(payload[field as keyof RecipeDraftPayload]),
+  ).map(field => DRAFT_FIELD_LABEL[field]);
 }
