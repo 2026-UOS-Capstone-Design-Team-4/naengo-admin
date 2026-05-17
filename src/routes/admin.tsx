@@ -1,104 +1,603 @@
-import axios from 'axios';
-import { useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import { getRecipeByVideoUrl } from '@/api/recipes';
-import { Recipe, RecipeCard } from '@/components/RecipeCard';
+import {
+  AdminRecipeDetail,
+  AdminRecipeFilters,
+  AdminRecipeListItem,
+  getAdminRecipe,
+  getAdminRecipes,
+} from '@/api/adminRecipes';
+import { getApiErrorMessage } from '@/api/client';
 
-type RecipeResult =
-  | { status: 'found'; data: Recipe }
-  | { status: 'not_found' }
-  | { status: 'error' };
+const SORT_OPTIONS = [
+  { label: '최신순', value: 'latest' },
+  { label: '좋아요순', value: 'likes' },
+  { label: '스크랩순', value: 'scraps' },
+] as const;
 
-export default function AdminPage() {
-  const [videoUrl, setVideoUrl] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [result, setResult] = useState<RecipeResult | null>(null);
+const ACTIVE_OPTIONS = [
+  { label: '전체', value: '' },
+  { label: '노출', value: 'true' },
+  { label: '숨김', value: 'false' },
+] as const;
 
-  const handleCheck = async () => {
-    if (!videoUrl.trim() || isLoading) return;
-    setIsLoading(true);
-    setResult(null);
+const AUTHOR_OPTIONS = [
+  { label: '전체', value: '' },
+  { label: '관리자', value: 'ADMIN' },
+  { label: '사용자', value: 'USER' },
+  { label: '수집 원본', value: 'SOURCE' },
+] as const;
 
-    try {
-      const data = await getRecipeByVideoUrl(videoUrl.trim());
-      setResult({ status: 'found', data });
-    } catch (error) {
-      if (axios.isAxiosError(error) && error.response?.status === 404) {
-        setResult({ status: 'not_found' });
-      } else {
-        setResult({ status: 'error' });
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  };
+const VISIBILITY_OPTIONS = [
+  { label: '전체', value: '' },
+  { label: '공개', value: 'PUBLIC' },
+  { label: '관리자 전용', value: 'ADMIN_ONLY' },
+] as const;
+
+const DIFFICULTY_OPTIONS = [
+  { label: '전체', value: '' },
+  { label: '쉬움', value: 'easy' },
+  { label: '보통', value: 'normal' },
+  { label: '어려움', value: 'hard' },
+] as const;
+
+const SOURCE_OPTIONS = [
+  { label: '전체', value: '' },
+  { label: '만개의레시피', value: '10000recipe' },
+  { label: 'foodsafetykorea', value: 'foodsafetykorea' },
+] as const;
+
+function formatDate(value?: string | null) {
+  if (!value) return '-';
+  return new Intl.DateTimeFormat('ko-KR', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(value));
+}
+
+function sourceLabel(value?: string | null) {
+  if (value === '10000recipe') return '만개의레시피';
+  if (value === 'foodsafetykorea') return 'foodsafetykorea';
+  return value || '직접 생성';
+}
+
+function difficultyLabel(value?: string | null) {
+  if (value === 'easy') return '쉬움';
+  if (value === 'normal') return '보통';
+  if (value === 'hard') return '어려움';
+  return value || '-';
+}
+
+function SelectFilter({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  options: readonly { label: string; value: string }[];
+  onChange: (value: string) => void;
+}) {
+  return (
+    <label className="flex min-w-36 flex-col gap-1 text-xs font-semibold text-slate-500">
+      {label}
+      <select
+        value={value}
+        onChange={event => onChange(event.target.value)}
+        className="h-9 rounded border border-slate-200 bg-white px-2 text-sm font-medium text-slate-900 outline-none focus:border-(--color-main-ui)"
+      >
+        {options.map(option => (
+          <option key={option.value || 'all'} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+function Flag({ active, label }: { active: boolean; label: string }) {
+  return (
+    <span
+      className={`rounded px-2 py-0.5 text-xs font-semibold ${
+        active
+          ? 'bg-emerald-50 text-emerald-700'
+          : 'bg-slate-100 text-slate-400'
+      }`}
+    >
+      {label}
+    </span>
+  );
+}
+
+function RecipeRow({
+  recipe,
+  selected,
+  onClick,
+}: {
+  recipe: AdminRecipeListItem;
+  selected: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`grid w-full min-w-[50rem] grid-cols-[5rem_1fr_6rem_7rem_7rem_6rem_7rem] items-center gap-3 border-b border-slate-100 px-4 py-3 text-left text-sm hover:bg-slate-50 ${
+        selected ? 'bg-rose-50' : 'bg-white'
+      }`}
+    >
+      <span className="font-mono text-xs text-slate-500">
+        #{recipe.recipe_id}
+      </span>
+      <span className="min-w-0">
+        <span className="block truncate font-semibold text-slate-950">
+          {recipe.title}
+        </span>
+        <span className="mt-0.5 block truncate text-xs text-slate-500">
+          {sourceLabel(recipe.source_site)} · {recipe.visibility}
+        </span>
+      </span>
+      <span className="text-xs text-slate-600">
+        {recipe.cooking_time_minutes}분
+      </span>
+      <span className="text-xs font-semibold text-slate-600">
+        {difficultyLabel(recipe.difficulty)}
+      </span>
+      <span className="text-xs text-slate-600">
+        {recipe.kcal_per_serving ?? '-'} kcal
+      </span>
+      <Flag
+        active={recipe.is_active}
+        label={recipe.is_active ? '노출' : '숨김'}
+      />
+      <span className="text-xs text-slate-500">
+        {formatDate(recipe.created_at)}
+      </span>
+    </button>
+  );
+}
+
+function Metric({
+  label,
+  value,
+}: {
+  label: string;
+  value: string | number | null | undefined;
+}) {
+  return (
+    <div className="rounded border border-slate-200 bg-slate-50 px-3 py-2">
+      <p className="text-xs font-semibold text-slate-500">{label}</p>
+      <p className="mt-1 text-sm font-semibold text-slate-950">
+        {value ?? '-'}
+      </p>
+    </div>
+  );
+}
+
+function DetailPanel({ detail }: { detail: AdminRecipeDetail | null }) {
+  const primaryImage = useMemo(
+    () =>
+      detail?.media.find(item => item.is_primary)?.storage_url ??
+      detail?.media[0]?.storage_url,
+    [detail],
+  );
+
+  if (!detail) {
+    return (
+      <aside className="flex h-full items-center justify-center border-l border-slate-200 bg-white text-sm text-slate-500">
+        왼쪽 목록에서 레시피를 선택하세요.
+      </aside>
+    );
+  }
+
+  const categories = detail.labels.filter(
+    label => label.label_type === 'CATEGORY',
+  );
 
   return (
-    <div className="flex-1 overflow-y-auto p-4">
-      <p className="mb-3 text-sm font-semibold text-(--color-gray)">
-        YouTube URL로 레시피 조회
-      </p>
-      <div className="flex gap-2">
-        <input
-          type="text"
-          className="flex-1 rounded-full border border-(--color-light) bg-(--color-lightest) px-4 py-2 text-black focus:border-(--color-main) focus:outline-none"
-          placeholder="https://www.youtube.com/watch?v=..."
-          value={videoUrl}
-          onChange={e => setVideoUrl(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && handleCheck()}
-        />
-        <button
-          onClick={handleCheck}
-          disabled={isLoading}
-          className="rounded-full bg-(--color-main-ui) px-6 py-2 font-semibold text-white transition-colors hover:bg-(--color-main) disabled:bg-(--color-muted)"
-        >
-          조회
-        </button>
-      </div>
+    <aside className="flex h-full min-h-0 min-w-0 flex-col border-l border-slate-200 bg-white">
+      <header className="border-b border-slate-200 px-5 py-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-xs font-semibold text-slate-500">
+              #{detail.recipe_id} · {sourceLabel(detail.source_site)}
+            </p>
+            <h2 className="mt-1 line-clamp-2 text-lg font-bold text-slate-950">
+              {detail.title}
+            </h2>
+          </div>
+          <div className="flex shrink-0 gap-1">
+            <Flag active={detail.has_nutrition} label="영양" />
+            <Flag active={detail.has_classification} label="분류" />
+            <Flag active={detail.has_embedding} label="임베딩" />
+          </div>
+        </div>
+        {detail.source_url && (
+          <a
+            href={detail.source_url}
+            target="_blank"
+            rel="noreferrer"
+            className="mt-2 block truncate text-xs font-medium text-(--color-main-ui)"
+          >
+            {detail.source_url}
+          </a>
+        )}
+      </header>
 
-      {isLoading && (
-        <p className="mt-4 animate-pulse text-sm text-(--color-muted)">
-          조회 중...
+      <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-5 py-4">
+        {primaryImage && (
+          <img
+            src={primaryImage}
+            alt={detail.title}
+            className="aspect-video w-full rounded object-cover"
+          />
+        )}
+
+        <section className="grid grid-cols-2 gap-2 xl:grid-cols-4">
+          <Metric label="인분" value={detail.servings} />
+          <Metric
+            label="조리 시간"
+            value={`${detail.cooking_time_minutes}분`}
+          />
+          <Metric label="kcal/인분" value={detail.kcal_per_serving} />
+          <Metric label="난이도" value={difficultyLabel(detail.difficulty)} />
+        </section>
+
+        <section>
+          <h3 className="mb-2 text-sm font-bold text-slate-950">본문</h3>
+          <p className="text-sm leading-6 whitespace-pre-wrap text-slate-700">
+            {detail.description || detail.summary || '-'}
+          </p>
+        </section>
+
+        {categories.length > 0 && (
+          <section>
+            <h3 className="mb-2 text-sm font-bold text-slate-950">카테고리</h3>
+            <div className="flex flex-wrap gap-1">
+              {categories.map(label => (
+                <span
+                  key={label.label_id}
+                  className="rounded bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700"
+                >
+                  {label.label_value}
+                </span>
+              ))}
+            </div>
+          </section>
+        )}
+
+        <section>
+          <h3 className="mb-2 text-sm font-bold text-slate-950">재료</h3>
+          <div className="rounded border border-slate-200">
+            {detail.ingredients.map(ingredient => (
+              <div
+                key={ingredient.ingredient_id}
+                className="grid grid-cols-[1fr_7rem_5rem] gap-2 border-b border-slate-100 px-3 py-2 text-sm last:border-0"
+              >
+                <span className="font-medium text-slate-900">
+                  {ingredient.name}
+                </span>
+                <span className="text-slate-600">
+                  {ingredient.amount_text || '-'}
+                </span>
+                <span className="text-slate-500">
+                  {ingredient.is_optional ? '선택' : ''}
+                </span>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section>
+          <h3 className="mb-2 text-sm font-bold text-slate-950">조리 단계</h3>
+          <ol className="space-y-2">
+            {detail.steps.map(step => (
+              <li
+                key={step.step_id}
+                className="rounded border border-slate-200 px-3 py-2 text-sm"
+              >
+                <p className="font-semibold text-slate-500">
+                  Step {step.step_no}
+                </p>
+                <p className="mt-1 leading-6 text-slate-800">
+                  {step.instruction}
+                </p>
+                {step.tip && (
+                  <p className="mt-1 text-xs text-slate-500">Tip: {step.tip}</p>
+                )}
+              </li>
+            ))}
+          </ol>
+        </section>
+
+        {detail.nutrition && (
+          <section>
+            <h3 className="mb-2 text-sm font-bold text-slate-950">영양 정보</h3>
+            <div className="grid grid-cols-2 gap-2 xl:grid-cols-3">
+              <Metric
+                label="탄수화물"
+                value={detail.nutrition.carbohydrate_grams}
+              />
+              <Metric label="단백질" value={detail.nutrition.protein_grams} />
+              <Metric label="지방" value={detail.nutrition.fat_grams} />
+              <Metric
+                label="나트륨"
+                value={detail.nutrition.sodium_milligrams}
+              />
+            </div>
+          </section>
+        )}
+      </div>
+    </aside>
+  );
+}
+
+export default function AdminPage() {
+  const [filters, setFilters] = useState<AdminRecipeFilters>({
+    sort: 'latest',
+    is_active: '',
+    source_site: '',
+    author_type: '',
+    visibility: '',
+    difficulty: '',
+    q: '',
+  });
+  const [recipes, setRecipes] = useState<AdminRecipeListItem[]>([]);
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [detail, setDetail] = useState<AdminRecipeDetail | null>(null);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [hasNext, setHasNext] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const selectedRecipe = useMemo(
+    () => recipes.find(recipe => recipe.recipe_id === selectedId) ?? null,
+    [recipes, selectedId],
+  );
+
+  const loadRecipes = useCallback(
+    async (
+      nextFilters = filters,
+      options: { append?: boolean; cursor?: string | null } = {},
+    ) => {
+      const append = options.append === true;
+      if (append) {
+        setLoadingMore(true);
+      } else {
+        setLoading(true);
+      }
+      setErrorMessage(null);
+      try {
+        const data = await getAdminRecipes({
+          ...nextFilters,
+          cursor: options.cursor,
+        });
+        setNextCursor(data.next_cursor);
+        setHasNext(data.has_next);
+        if (append) {
+          setRecipes(currentRecipes => [...currentRecipes, ...data.items]);
+        } else {
+          setRecipes(data.items);
+          if (data.items.length === 0) {
+            setSelectedId(null);
+            setDetail(null);
+          } else {
+            setSelectedId(currentId =>
+              currentId && data.items.some(item => item.recipe_id === currentId)
+                ? currentId
+                : data.items[0].recipe_id,
+            );
+          }
+        }
+      } catch (error) {
+        setErrorMessage(
+          getApiErrorMessage(error, '운영 레시피 목록을 불러오지 못했습니다.'),
+        );
+      } finally {
+        if (append) {
+          setLoadingMore(false);
+        } else {
+          setLoading(false);
+        }
+      }
+    },
+    [filters],
+  );
+
+  const loadDetail = useCallback(async (recipeId: number) => {
+    setDetailLoading(true);
+    setErrorMessage(null);
+    try {
+      setDetail(await getAdminRecipe(recipeId));
+    } catch (error) {
+      setErrorMessage(
+        getApiErrorMessage(
+          error,
+          '운영 레시피 상세 정보를 불러오지 못했습니다.',
+        ),
+      );
+    } finally {
+      setDetailLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadRecipes();
+  }, [loadRecipes]);
+
+  useEffect(() => {
+    if (selectedId) void loadDetail(selectedId);
+  }, [loadDetail, selectedId]);
+
+  function updateFilter<K extends keyof AdminRecipeFilters>(
+    key: K,
+    value: AdminRecipeFilters[K],
+  ) {
+    const next = { ...filters, [key]: value };
+    setFilters(next);
+    void loadRecipes(next);
+  }
+
+  function loadNextPage() {
+    if (!nextCursor || loadingMore) return;
+    void loadRecipes(filters, { append: true, cursor: nextCursor });
+  }
+
+  return (
+    <div className="flex h-full flex-col overflow-hidden">
+      <header className="border-b border-slate-200 bg-white px-6 py-4">
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <h1 className="text-xl font-bold text-slate-950">
+              운영 레시피 관리
+            </h1>
+            <p className="mt-1 text-sm text-slate-500">
+              정식 등록된 레시피를 조회하고 원본, 영양, 분류 데이터를
+              확인합니다.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => void loadRecipes()}
+            className="h-9 rounded bg-(--color-main-ui) px-4 text-sm font-bold text-white"
+          >
+            새로고침
+          </button>
+        </div>
+
+        <div className="mt-4 flex flex-wrap items-end gap-3">
+          <label className="flex min-w-56 flex-col gap-1 text-xs font-semibold text-slate-500">
+            검색
+            <input
+              value={filters.q ?? ''}
+              onChange={event => updateFilter('q', event.target.value)}
+              placeholder="제목 검색"
+              className="h-9 rounded border border-slate-200 bg-white px-3 text-sm font-medium text-slate-900 outline-none focus:border-(--color-main-ui)"
+            />
+          </label>
+          <SelectFilter
+            label="정렬"
+            value={filters.sort ?? 'latest'}
+            options={SORT_OPTIONS}
+            onChange={value =>
+              updateFilter('sort', value as AdminRecipeFilters['sort'])
+            }
+          />
+          <SelectFilter
+            label="노출"
+            value={String(filters.is_active)}
+            options={ACTIVE_OPTIONS}
+            onChange={value =>
+              updateFilter('is_active', value === '' ? '' : value === 'true')
+            }
+          />
+          <SelectFilter
+            label="작성 주체"
+            value={filters.author_type ?? ''}
+            options={AUTHOR_OPTIONS}
+            onChange={value =>
+              updateFilter(
+                'author_type',
+                value as AdminRecipeFilters['author_type'],
+              )
+            }
+          />
+          <SelectFilter
+            label="공개 범위"
+            value={filters.visibility ?? ''}
+            options={VISIBILITY_OPTIONS}
+            onChange={value =>
+              updateFilter(
+                'visibility',
+                value as AdminRecipeFilters['visibility'],
+              )
+            }
+          />
+          <SelectFilter
+            label="난이도"
+            value={filters.difficulty ?? ''}
+            options={DIFFICULTY_OPTIONS}
+            onChange={value =>
+              updateFilter(
+                'difficulty',
+                value as AdminRecipeFilters['difficulty'],
+              )
+            }
+          />
+          <SelectFilter
+            label="출처"
+            value={filters.source_site ?? ''}
+            options={SOURCE_OPTIONS}
+            onChange={value => updateFilter('source_site', value)}
+          />
+        </div>
+      </header>
+
+      {errorMessage && (
+        <p className="mx-6 mt-3 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          {errorMessage}
         </p>
       )}
 
-      {result?.status === 'not_found' && (
-        <div className="mt-4 rounded-2xl border border-(--color-light) bg-(--color-lightest) px-4 py-3 text-sm text-(--color-gray)">
-          DB에 등록되지 않은 레시피예요.
-        </div>
-      )}
-
-      {result?.status === 'error' && (
-        <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-500">
-          조회 중 오류가 발생했습니다.
-        </div>
-      )}
-
-      {result?.status === 'found' && (
-        <div className="mt-4">
-          <div className="mb-2 flex items-center gap-3 text-xs text-(--color-gray)">
-            <span className="font-semibold text-(--color-gray)">DB에 등록된 레시피예요.</span>
-            <span
-              className={`rounded-full px-2 py-0.5 font-semibold ${
-                result.data.is_active
-                  ? 'bg-green-100 text-green-600'
-                  : 'bg-red-100 text-red-500'
-              }`}
-            >
-              {result.data.is_active ? '활성' : '비활성'}
-            </span>
-            {result.data.author_type && (
-              <span className="rounded-full bg-(--color-light) px-2 py-0.5">
-                {result.data.author_type}
-              </span>
-            )}
-            {result.data.created_at && (
-              <span>{new Date(result.data.created_at).toLocaleDateString('ko-KR')}</span>
+      <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_minmax(24rem,34rem)] overflow-hidden">
+        <section className="min-w-0 overflow-hidden bg-white">
+          <div className="h-full overflow-auto pb-20">
+            <div className="grid min-w-[50rem] grid-cols-[5rem_1fr_6rem_7rem_7rem_6rem_7rem] gap-3 border-b border-slate-200 bg-slate-50 px-4 py-2 text-xs font-bold tracking-wide text-slate-500 uppercase">
+              <span>ID</span>
+              <span>Title</span>
+              <span>Time</span>
+              <span>Difficulty</span>
+              <span>Kcal</span>
+              <span>Active</span>
+              <span>Created</span>
+            </div>
+            {loading ? (
+              <p className="px-4 py-5 text-sm text-slate-500">불러오는 중...</p>
+            ) : recipes.length === 0 ? (
+              <p className="px-4 py-5 text-sm text-slate-500">
+                조건에 맞는 레시피가 없습니다.
+              </p>
+            ) : (
+              <>
+                {recipes.map(recipe => (
+                  <RecipeRow
+                    key={recipe.recipe_id}
+                    recipe={recipe}
+                    selected={recipe.recipe_id === selectedId}
+                    onClick={() => setSelectedId(recipe.recipe_id)}
+                  />
+                ))}
+                {hasNext && (
+                  <div className="min-w-[50rem] border-t border-slate-100 px-4 py-3">
+                    <button
+                      type="button"
+                      onClick={loadNextPage}
+                      disabled={loadingMore}
+                      className="h-9 w-full rounded border border-slate-200 bg-white text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:text-slate-400"
+                    >
+                      {loadingMore ? '불러오는 중...' : '더 보기'}
+                    </button>
+                  </div>
+                )}
+              </>
             )}
           </div>
-          <RecipeCard recipe={result.data} />
-        </div>
-      )}
+        </section>
+
+        {detailLoading && selectedRecipe ? (
+          <aside className="flex h-full items-center justify-center border-l border-slate-200 bg-white text-sm text-slate-500">
+            상세 정보를 불러오는 중...
+          </aside>
+        ) : (
+          <DetailPanel detail={detail} />
+        )}
+      </div>
     </div>
   );
 }
