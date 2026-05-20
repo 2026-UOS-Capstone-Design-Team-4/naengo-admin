@@ -40,7 +40,7 @@ export interface Recipe {
   ingredients_raw: string;
   steps: RecipeStep[];
   servings: number;
-  cooking_time: number;
+  cooking_time_minutes: number;
   calories?: number | null;
   difficulty: 'easy' | 'normal' | 'hard' | string;
   category: string[];
@@ -59,13 +59,10 @@ export interface Recipe {
 }
 
 export type PendingRecipeStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
-export type PendingRecipeImportStatus =
-  | 'NOT_IMPORTED'
-  | 'IMPORTED'
-  | 'FAILED';
+export type PendingRecipeImportStatus = 'NOT_IMPORTED' | 'IMPORTED' | 'FAILED';
 
 export interface PendingRecipe {
-  pending_recipe_id: number;
+  user_recipe_id: number;
   user_id: number;
   title: string;
   submission_text: string;
@@ -117,7 +114,7 @@ export function RecipeCard({ recipe }: { recipe: Recipe }) {
             <span>
               {DIFFICULTY_LABEL[recipe.difficulty] ?? recipe.difficulty}
             </span>
-            <span>{recipe.cooking_time}분</span>
+            <span>{recipe.cooking_time_minutes}분</span>
             <span>{recipe.servings}인분</span>
             {recipe.calories != null && <span>{recipe.calories}kcal</span>}
           </div>
@@ -178,7 +175,7 @@ export function RecipeCard({ recipe }: { recipe: Recipe }) {
                     )}
                     {step.instruction}
                     {step.tip && (
-                      <p className="mt-0.5 text-xs italic text-(--color-muted)">
+                      <p className="mt-0.5 text-xs text-(--color-muted) italic">
                         Tip: {step.tip}
                       </p>
                     )}
