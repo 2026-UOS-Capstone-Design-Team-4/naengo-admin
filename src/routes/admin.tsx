@@ -1,3 +1,4 @@
+import { RefreshCw } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import {
@@ -126,8 +127,8 @@ function RecipeRow({
     <button
       type="button"
       onClick={onClick}
-      className={`grid w-full min-w-[50rem] grid-cols-[5rem_1fr_6rem_7rem_7rem_6rem_7rem] items-center gap-3 border-b border-slate-100 px-4 py-3 text-left text-sm hover:bg-slate-50 ${
-        selected ? 'bg-rose-50' : 'bg-white'
+      className={`grid w-full min-w-[50rem] grid-cols-[5rem_1fr_6rem_7rem_7rem_6rem_7rem] items-center gap-3 border-b border-slate-100 px-4 py-3 text-left text-sm transition-colors hover:bg-slate-50 ${
+        selected ? 'border-l-2 border-l-(--color-main) bg-(--color-lighter)' : 'bg-white'
       }`}
     >
       <span className="font-mono text-xs text-slate-500">
@@ -465,8 +466,9 @@ export default function AdminPage() {
           <button
             type="button"
             onClick={() => void loadRecipes()}
-            className="h-9 rounded bg-(--color-main-ui) px-4 text-sm font-bold text-white"
+            className="flex items-center gap-1.5 h-9 rounded-lg bg-(--color-main-ui) px-4 text-sm font-bold text-white transition-colors hover:bg-(--color-main)"
           >
+            <RefreshCw size={14} />
             새로고침
           </button>
         </div>
@@ -540,27 +542,39 @@ export default function AdminPage() {
       </header>
 
       {errorMessage && (
-        <p className="mx-6 mt-3 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+        <div className="mx-6 mt-3 rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-700">
           {errorMessage}
-        </p>
+        </div>
       )}
 
-      <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_minmax(24rem,34rem)] overflow-hidden">
+      <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_minmax(20rem,28rem)] overflow-hidden">
         <section className="min-w-0 overflow-hidden bg-white">
           <div className="h-full overflow-auto pb-20">
-            <div className="grid min-w-[50rem] grid-cols-[5rem_1fr_6rem_7rem_7rem_6rem_7rem] gap-3 border-b border-slate-200 bg-slate-50 px-4 py-2 text-xs font-bold tracking-wide text-slate-500 uppercase">
-              <span>ID</span>
-              <span>Title</span>
-              <span>Time</span>
-              <span>Difficulty</span>
-              <span>Kcal</span>
-              <span>Active</span>
-              <span>Created</span>
+            <div className="grid min-w-[50rem] grid-cols-[5rem_1fr_6rem_7rem_7rem_6rem_7rem] gap-3 border-b border-slate-200 bg-slate-50 px-4 py-2 text-xs font-bold tracking-wide text-slate-500">
+              <span>번호</span>
+              <span>제목</span>
+              <span>시간</span>
+              <span>난이도</span>
+              <span>칼로리</span>
+              <span>상태</span>
+              <span>생성일</span>
             </div>
             {loading ? (
-              <p className="px-4 py-5 text-sm text-slate-500">불러오는 중...</p>
+              <div className="min-w-[50rem]">
+                {Array.from({ length: 10 }).map((_, i) => (
+                  <div key={i} className="grid grid-cols-[5rem_1fr_6rem_7rem_7rem_6rem_7rem] gap-3 border-b border-slate-100 px-4 py-3">
+                    <div className="h-4 w-10 animate-pulse rounded bg-slate-200" />
+                    <div className="h-4 w-48 animate-pulse rounded bg-slate-200" />
+                    <div className="h-4 w-10 animate-pulse rounded bg-slate-200" />
+                    <div className="h-4 w-12 animate-pulse rounded bg-slate-200" />
+                    <div className="h-4 w-14 animate-pulse rounded bg-slate-200" />
+                    <div className="h-4 w-10 animate-pulse rounded bg-slate-200" />
+                    <div className="h-4 w-20 animate-pulse rounded bg-slate-200" />
+                  </div>
+                ))}
+              </div>
             ) : recipes.length === 0 ? (
-              <p className="px-4 py-5 text-sm text-slate-500">
+              <p className="px-4 py-10 text-center text-sm text-slate-500">
                 조건에 맞는 레시피가 없습니다.
               </p>
             ) : (
@@ -579,9 +593,9 @@ export default function AdminPage() {
                       type="button"
                       onClick={loadNextPage}
                       disabled={loadingMore}
-                      className="h-9 w-full rounded border border-slate-200 bg-white text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:text-slate-400"
+                      className="h-9 w-full rounded-lg border border-slate-200 bg-white text-sm font-bold text-slate-700 transition-colors hover:bg-slate-50 disabled:text-slate-400"
                     >
-                      {loadingMore ? '불러오는 중...' : '더 보기'}
+                      {loadingMore ? '불러오는 중...' : `더 보기`}
                     </button>
                   </div>
                 )}
