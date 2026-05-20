@@ -12,7 +12,7 @@ export const router = createBrowserRouter([
       { index: true, element: <ChatPage /> },
       { path: 'admin', element: <Navigate to="/admin/recipes" replace /> },
       { path: 'admin/recipes', element: <AdminPage /> },
-      { path: 'admin/pending-recipes', element: <RecipesPage /> },
+      { path: 'admin/user-recipes', element: <RecipesPage /> },
       { path: 'recipes', element: <RecipesPage /> },
     ],
   },
