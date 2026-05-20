@@ -9,13 +9,15 @@ import client from './client';
 export async function getPendingRecipes(
   status: PendingRecipeStatus | '' = 'PENDING',
   isActive: boolean | '' = true,
+  q?: string,
 ): Promise<PendingRecipe[]> {
   const { data } = await client.get<{ items: PendingRecipe[] }>(
-    '/admin/pending-recipes',
+    '/admin/user-recipes',
     {
       params: {
         ...(status ? { status } : {}),
         ...(isActive === '' ? {} : { is_active: isActive }),
+        ...(q ? { q } : {}),
         limit: 100,
       },
     },
@@ -27,6 +29,7 @@ export interface PendingRecipeUpdatePayload {
   title?: string | null;
   submission_text?: string | null;
   draft_payload?: RecipeDraftPayload | null;
+  ai_suggested_patch?: RecipeDraftPayload | null;
   status?: PendingRecipeStatus | null;
   admin_note?: string | null;
   rejection_reason?: string | null;
@@ -37,7 +40,7 @@ async function patchPendingRecipe(
   payload: PendingRecipeUpdatePayload,
 ): Promise<PendingRecipe> {
   const { data } = await client.patch<PendingRecipe>(
-    `/admin/pending-recipes/${id}`,
+    `/admin/user-recipes/${id}`,
     payload,
   );
   return data;
@@ -69,7 +72,7 @@ export async function changePendingRecipeStatus(
 }
 
 export async function hardDeletePendingRecipe(id: number): Promise<void> {
-  await client.delete(`/admin/pending-recipes/${id}`);
+  await client.delete(`/admin/user-recipes/${id}`);
 }
 
 export async function updatePendingRecipe(
@@ -95,14 +98,14 @@ const REQUIRED_DRAFT_FIELDS = [
 type RequiredDraftField = (typeof REQUIRED_DRAFT_FIELDS)[number];
 
 const DRAFT_FIELD_LABEL: Record<RequiredDraftField, string> = {
-  description: 'description',
-  ingredients: 'ingredients',
-  ingredients_raw: 'ingredients_raw',
-  instructions: 'instructions',
-  servings: 'servings',
-  cooking_time_minutes: 'cooking_time_minutes',
-  difficulty: 'difficulty',
-  category: 'category',
+  description: '설명',
+  ingredients: '재료',
+  ingredients_raw: '재료 원문',
+  instructions: '조리 순서',
+  servings: '인분',
+  cooking_time_minutes: '조리 시간',
+  difficulty: '난이도',
+  category: '카테고리',
 };
 
 function isEmpty(value: unknown): boolean {
