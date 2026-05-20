@@ -1,3 +1,4 @@
+import { RefreshCw, Search } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 import { getApiErrorMessage } from '@/api/client';
@@ -7,9 +8,16 @@ import {
   getPendingRecipes,
   hardDeletePendingRecipe,
 } from '@/api/recipes';
-import { PendingRecipe, PendingRecipeStatus } from '@/components/RecipeCard';
+import {
+  PendingRecipe,
+  PendingRecipeStatus,
+  RecipeDraftPayload,
+} from '@/components/RecipeCard';
 
-const STATUS_FILTERS: Array<{ label: string; value: PendingRecipeStatus | '' }> = [
+const STATUS_FILTERS: Array<{
+  label: string;
+  value: PendingRecipeStatus | '';
+}> = [
   { label: '전체', value: '' },
   { label: '대기', value: 'PENDING' },
   { label: '승인', value: 'APPROVED' },
@@ -28,10 +36,22 @@ const STATUS_LABEL: Record<PendingRecipeStatus, string> = {
   REJECTED: '거절',
 };
 
+const IMPORT_STATUS_LABEL: Record<string, string> = {
+  NOT_IMPORTED: '미임포트',
+  IMPORTED: '임포트 완료',
+  FAILED: '임포트 실패',
+};
+
 const STATUS_BADGE_CLASS: Record<PendingRecipeStatus, string> = {
-  PENDING: 'bg-amber-50 text-amber-700',
-  APPROVED: 'bg-emerald-50 text-emerald-700',
-  REJECTED: 'bg-red-50 text-red-700',
+  PENDING: 'bg-amber-50 text-amber-700 ring-1 ring-amber-200',
+  APPROVED: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200',
+  REJECTED: 'bg-red-50 text-red-700 ring-1 ring-red-200',
+};
+
+const DIFFICULTY_LABEL: Record<string, string> = {
+  easy: '쉬움',
+  normal: '보통',
+  hard: '어려움',
 };
 
 function toStringList(value: unknown): string[] {
@@ -45,21 +65,18 @@ function toStringList(value: unknown): string[] {
       .map(item => item.trim())
       .filter(Boolean);
   }
-
   if (typeof value === 'string') {
     return value
       .split(',')
       .map(item => item.trim())
       .filter(Boolean);
   }
-
   if (value && typeof value === 'object') {
     return Object.values(value)
       .filter(item => typeof item === 'string' || typeof item === 'number')
       .map(item => String(item).trim())
       .filter(Boolean);
   }
-
   return [];
 }
 
@@ -69,9 +86,164 @@ function toText(value: unknown): string {
   return String(value);
 }
 
-function toInstructionText(item: string | { instruction?: string | null }): string {
+function toInstructionText(
+  item: string | { instruction?: string | null },
+): string {
   if (typeof item === 'string') return item;
   return item.instruction ?? '';
+}
+
+function formatDate(value?: string | null) {
+  if (!value) return '-';
+  return new Intl.DateTimeFormat('ko-KR', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(value));
+}
+
+function hasDiff(
+  draft: RecipeDraftPayload,
+  patch: RecipeDraftPayload,
+): boolean {
+  return JSON.stringify(draft) !== JSON.stringify(patch);
+}
+
+function getDiffFields(
+  draft: RecipeDraftPayload,
+  patch: RecipeDraftPayload,
+): Set<string> {
+  const keys = new Set([...Object.keys(draft), ...Object.keys(patch)]);
+  const changed = new Set<string>();
+  keys.forEach(key => {
+    if (
+      JSON.stringify(draft[key as keyof RecipeDraftPayload]) !==
+      JSON.stringify(patch[key as keyof RecipeDraftPayload])
+    ) {
+      changed.add(key);
+    }
+  });
+  return changed;
+}
+
+function DraftContent({
+  draft,
+  diffFields,
+}: {
+  draft: RecipeDraftPayload;
+  diffFields?: Set<string>;
+}) {
+  const categories = toStringList(draft.category);
+  const instructions = draft.instructions ?? [];
+  const isDiff = (field: string) => diffFields?.has(field);
+
+  return (
+    <div className="space-y-2.5 text-xs">
+      {draft.description && (
+        <p
+          className={`leading-5 text-slate-600 ${isDiff('description') ? 'rounded bg-amber-50 px-2 py-1 ring-1 ring-amber-200' : ''}`}
+        >
+          {draft.description}
+        </p>
+      )}
+
+      <div className="grid grid-cols-2 gap-2">
+        {draft.servings != null && (
+          <div
+            className={`rounded border border-slate-200 bg-slate-50 px-2.5 py-1.5 ${isDiff('servings') ? 'border-amber-200 bg-amber-50' : ''}`}
+          >
+            <p className="text-[10px] font-semibold text-slate-400">인분</p>
+            <p className="mt-0.5 font-semibold text-slate-800">
+              {draft.servings}
+            </p>
+          </div>
+        )}
+        {draft.cooking_time_minutes != null && (
+          <div
+            className={`rounded border border-slate-200 bg-slate-50 px-2.5 py-1.5 ${isDiff('cooking_time_minutes') ? 'border-amber-200 bg-amber-50' : ''}`}
+          >
+            <p className="text-[10px] font-semibold text-slate-400">
+              조리 시간
+            </p>
+            <p className="mt-0.5 font-semibold text-slate-800">
+              {draft.cooking_time_minutes}분
+            </p>
+          </div>
+        )}
+        {draft.kcal_per_serving != null && (
+          <div
+            className={`rounded border border-slate-200 bg-slate-50 px-2.5 py-1.5 ${isDiff('kcal_per_serving') ? 'border-amber-200 bg-amber-50' : ''}`}
+          >
+            <p className="text-[10px] font-semibold text-slate-400">칼로리</p>
+            <p className="mt-0.5 font-semibold text-slate-800">
+              {draft.kcal_per_serving}kcal
+            </p>
+          </div>
+        )}
+        {draft.difficulty && (
+          <div
+            className={`rounded border border-slate-200 bg-slate-50 px-2.5 py-1.5 ${isDiff('difficulty') ? 'border-amber-200 bg-amber-50' : ''}`}
+          >
+            <p className="text-[10px] font-semibold text-slate-400">난이도</p>
+            <p className="mt-0.5 font-semibold text-slate-800">
+              {DIFFICULTY_LABEL[draft.difficulty] ?? draft.difficulty}
+            </p>
+          </div>
+        )}
+      </div>
+
+      {draft.ingredients_raw && (
+        <div
+          className={`rounded border border-slate-200 px-2.5 py-1.5 ${isDiff('ingredients_raw') ? 'border-amber-200 bg-amber-50' : 'bg-slate-50'}`}
+        >
+          <p className="mb-1 text-[10px] font-semibold text-slate-400">
+            재료 원문
+          </p>
+          <p className="line-clamp-2 text-slate-600">
+            {toText(draft.ingredients_raw)}
+          </p>
+        </div>
+      )}
+
+      {instructions.length > 0 && (
+        <div
+          className={
+            isDiff('instructions')
+              ? 'rounded bg-amber-50 px-2 py-1 ring-1 ring-amber-200'
+              : ''
+          }
+        >
+          <p className="mb-1 text-[10px] font-semibold text-slate-400">
+            조리 순서
+          </p>
+          <ol className="list-decimal space-y-1 pl-4 text-slate-600">
+            {instructions.slice(0, 3).map((step, index) => (
+              <li key={String(index)}>{toInstructionText(step)}</li>
+            ))}
+            {instructions.length > 3 && (
+              <li className="text-slate-400">
+                +{instructions.length - 3}개 더...
+              </li>
+            )}
+          </ol>
+        </div>
+      )}
+
+      {categories.length > 0 && (
+        <div className="flex flex-wrap gap-1">
+          {categories.map(category => (
+            <span
+              key={category}
+              className="rounded-full bg-(--color-lighter) px-2 py-0.5 text-[10px] font-semibold text-(--color-main-ui) ring-1 ring-(--color-light)"
+            >
+              {category}
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function PendingRecipeCard({
@@ -93,153 +265,166 @@ function PendingRecipeCard({
   const [nextStatus, setNextStatus] = useState<PendingRecipeStatus>(
     recipe.status,
   );
+  const [activeTab, setActiveTab] = useState<'draft' | 'ai'>('draft');
+
   const missingLabels = getMissingFieldLabels(recipe);
   const isImportReady = missingLabels.length === 0;
 
   const draft = recipe.draft_payload;
-  const categories = toStringList(draft.category);
-  const instructions = draft.instructions ?? [];
+  const aiPatch = recipe.ai_suggested_patch as RecipeDraftPayload;
+  const hasPatchDiff = aiPatch && hasDiff(draft, aiPatch);
+  const diffFields = hasPatchDiff
+    ? getDiffFields(draft, aiPatch)
+    : new Set<string>();
 
   useEffect(() => {
     setNextStatus(recipe.status);
   }, [recipe.status]);
 
   return (
-    <article className="flex h-full min-h-96 flex-col rounded-lg border border-(--color-light) bg-white shadow-sm">
-      <div className="border-b border-(--color-light) px-4 py-3">
+    <article className="flex h-full min-h-96 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+      {/* Card header */}
+      <div className="border-b border-slate-100 px-4 py-3">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-xs font-semibold text-(--color-muted)">
-              #{recipe.pending_recipe_id}
+            <p className="text-[10px] font-semibold text-slate-400">
+              #{recipe.user_recipe_id} · user {recipe.user_id}
             </p>
-            <h2 className="mt-1 line-clamp-2 font-bold text-black">
+            <h2 className="mt-0.5 line-clamp-2 font-bold text-slate-900">
               {recipe.title}
             </h2>
           </div>
-          <div className="flex shrink-0 flex-col items-end gap-1">
+          <div className="flex shrink-0 flex-col items-end gap-1.5">
             <span
-              className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
-                STATUS_BADGE_CLASS[recipe.status]
-              }`}
+              className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${STATUS_BADGE_CLASS[recipe.status]}`}
             >
-              검수 {STATUS_LABEL[recipe.status]}
+              {STATUS_LABEL[recipe.status]}
             </span>
             {!recipe.is_active && (
-              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-500">
+              <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-500">
                 삭제됨
               </span>
             )}
             <span
-              className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+              className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ${
                 isImportReady
-                  ? 'bg-emerald-50 text-emerald-700'
-                  : 'bg-slate-50 text-slate-600'
+                  ? 'bg-emerald-50 text-emerald-700 ring-emerald-200'
+                  : 'bg-slate-50 text-slate-500 ring-slate-200'
               }`}
             >
-              Import {recipe.import_status}
+              {IMPORT_STATUS_LABEL[recipe.import_status] ??
+                recipe.import_status}
             </span>
           </div>
         </div>
+        {recipe.reviewed_at && (
+          <p className="mt-1.5 text-[10px] text-slate-400">
+            검토: {formatDate(recipe.reviewed_at)}
+            {recipe.reviewed_by && ` · by #${recipe.reviewed_by}`}
+          </p>
+        )}
       </div>
 
-      <div className="flex-1 space-y-3 overflow-y-auto px-4 py-3 text-sm">
-        <section className="rounded-lg border border-(--color-light) bg-(--color-lightest) px-3 py-3">
-          <div className="mb-2 flex items-center justify-between gap-2">
-            <h3 className="font-semibold text-black">제출 원문</h3>
-            <span className="rounded-full bg-white px-2 py-0.5 text-xs font-semibold text-(--color-main)">
-              승인 판단 기준
+      <div className="flex-1 space-y-3 overflow-y-auto px-4 py-3">
+        {/* 제출 원문 */}
+        <section className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5">
+          <div className="mb-1.5 flex items-center justify-between gap-2">
+            <h3 className="text-xs font-semibold text-slate-700">제출 원문</h3>
+            <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold text-(--color-main-ui) ring-1 ring-(--color-light)">
+              승인 기준
             </span>
           </div>
-          <p className="max-h-36 overflow-y-auto whitespace-pre-wrap text-(--color-gray)">
+          <p className="max-h-28 overflow-y-auto text-xs leading-5 whitespace-pre-wrap text-slate-600">
             {recipe.submission_text}
           </p>
         </section>
 
-        <section className="rounded-lg border border-dashed border-(--color-light) px-3 py-3">
-          <div className="mb-2 flex items-center justify-between gap-2">
-            <h3 className="font-semibold text-(--color-main)">Import draft</h3>
+        {/* Draft / AI 제안 탭 */}
+        <section className="rounded-lg border border-dashed border-slate-200 px-3 py-2.5">
+          <div className="mb-2.5 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1 rounded-full bg-slate-100 p-0.5">
+              <button
+                type="button"
+                onClick={() => setActiveTab('draft')}
+                className={`rounded-full px-3 py-1 text-xs font-semibold transition-all ${
+                  activeTab === 'draft'
+                    ? 'bg-white text-slate-900 shadow-sm'
+                    : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                Draft
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('ai')}
+                className={`flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold transition-all ${
+                  activeTab === 'ai'
+                    ? 'bg-white text-slate-900 shadow-sm'
+                    : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                AI 제안
+                {hasPatchDiff && (
+                  <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
+                )}
+              </button>
+            </div>
             <span
-              className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+              className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ${
                 isImportReady
-                  ? 'bg-emerald-50 text-emerald-700'
-                  : 'bg-amber-50 text-amber-700'
+                  ? 'bg-emerald-50 text-emerald-700 ring-emerald-200'
+                  : 'bg-amber-50 text-amber-700 ring-amber-200'
               }`}
             >
-              {isImportReady ? '준비됨' : '보완 필요'}
+              {isImportReady ? 'Import 준비됨' : '보완 필요'}
             </span>
           </div>
 
-          <div className="space-y-2 text-xs">
-            {draft.description && (
-              <p className="line-clamp-2 text-(--color-gray)">
-                {draft.description}
-              </p>
-            )}
-
-            <div className="grid grid-cols-2 gap-2 text-(--color-muted)">
-              {draft.servings != null && <span>{draft.servings}인분</span>}
-              {draft.cooking_time_minutes != null && (
-                <span>{draft.cooking_time_minutes}분</span>
+          {activeTab === 'draft' ? (
+            <DraftContent draft={draft} />
+          ) : (
+            <div>
+              {hasPatchDiff ? (
+                <div>
+                  <p className="mb-2 text-[10px] font-semibold text-amber-600">
+                    ▲ {diffFields.size}개 필드 변경 제안
+                  </p>
+                  <DraftContent draft={aiPatch} diffFields={diffFields} />
+                </div>
+              ) : (
+                <p className="text-xs text-slate-400">Draft와 동일합니다.</p>
               )}
-              {draft.kcal_per_serving != null && (
-                <span>{draft.kcal_per_serving}kcal</span>
-              )}
-              {draft.difficulty && <span>{draft.difficulty}</span>}
-              {recipe.imported_recipe_id != null && (
-                <span>Recipe #{recipe.imported_recipe_id}</span>
-              )}
-              {recipe.imported_at && <span>{recipe.imported_at}</span>}
             </div>
-
-            {draft.ingredients_raw && (
-              <p className="line-clamp-2 text-(--color-gray)">
-                재료: {toText(draft.ingredients_raw)}
-              </p>
-            )}
-          </div>
+          )}
         </section>
 
-        {instructions.length > 0 && (
-          <section>
-            <h3 className="mb-1 font-semibold text-(--color-main)">조리 순서</h3>
-            <ol className="list-decimal space-y-1 pl-5 text-(--color-gray)">
-              {instructions.map((step, index) => (
-                <li key={String(index)}>{toInstructionText(step)}</li>
-              ))}
-            </ol>
-          </section>
-        )}
-
-        {categories.length > 0 && (
-          <div className="flex flex-wrap gap-1">
-            {categories.map(category => (
-              <span
-                key={category}
-                className="rounded-full bg-(--color-main) px-2 py-0.5 text-xs text-white"
-              >
-                {category}
-              </span>
-            ))}
-          </div>
-        )}
-
+        {/* 검증 오류 */}
         {recipe.validation_errors.length > 0 && (
-          <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
-            <span className="font-semibold">검증 오류: </span>
-            {recipe.validation_errors.map(e => e.message).join(', ')}
+          <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2">
+            <p className="mb-1 text-xs font-semibold text-red-700">검증 오류</p>
+            <ul className="space-y-0.5">
+              {recipe.validation_errors.map((e, i) => (
+                <li key={i} className="text-xs text-red-600">
+                  {e.message}
+                </li>
+              ))}
+            </ul>
           </div>
         )}
 
+        {/* 관리자 메모 / 거절 사유 */}
         {(recipe.admin_note || recipe.rejection_reason) && (
-          <section className="rounded-lg border border-(--color-light) px-3 py-2 text-xs">
+          <section className="rounded-lg border border-slate-200 px-3 py-2.5">
             {recipe.admin_note && (
-              <p className="whitespace-pre-wrap text-(--color-gray)">
-                <span className="font-semibold text-black">관리자 메모: </span>
+              <p className="text-xs whitespace-pre-wrap text-slate-600">
+                <span className="font-semibold text-slate-900">
+                  관리자 메모:{' '}
+                </span>
                 {recipe.admin_note}
               </p>
             )}
             {recipe.rejection_reason && (
-              <p className="mt-1 whitespace-pre-wrap text-red-600">
+              <p className="mt-1 text-xs whitespace-pre-wrap text-red-600">
                 <span className="font-semibold">거절 사유: </span>
                 {recipe.rejection_reason}
               </p>
@@ -247,75 +432,87 @@ function PendingRecipeCard({
           </section>
         )}
 
+        {/* Import 보완 필요 */}
         {missingLabels.length > 0 && (
-          <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-            <span className="font-semibold">Import 전 보완 필요: </span>
-            {missingLabels.join(', ')}
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+            <p className="text-xs font-semibold text-amber-800">
+              Import 전 보완 필요:{' '}
+              <span className="font-normal">{missingLabels.join(', ')}</span>
+            </p>
+          </div>
+        )}
+
+        {/* Import 완료 정보 */}
+        {recipe.imported_recipe_id != null && (
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2">
+            <p className="text-xs text-emerald-700">
+              <span className="font-semibold">Import 완료</span>
+              {' · '}Recipe #{recipe.imported_recipe_id}
+              {recipe.imported_at && ` · ${formatDate(recipe.imported_at)}`}
+            </p>
           </div>
         )}
       </div>
 
-      <div className="space-y-2 border-t border-(--color-light) px-4 py-3">
-        <div className="rounded-lg border border-(--color-light) bg-(--color-lightest) px-3 py-2">
-          <p className="text-xs font-semibold text-(--color-muted)">현재 상태</p>
-          <p className="mt-0.5 text-sm font-bold text-black">
-            {STATUS_LABEL[recipe.status]}
-          </p>
-        </div>
-        <div className="grid grid-cols-[1fr_auto] gap-2">
-          <label className="flex flex-col gap-1 text-xs font-semibold text-(--color-muted)">
-            변경할 상태
-            <select
-              value={nextStatus}
-              onChange={event =>
-                setNextStatus(event.target.value as PendingRecipeStatus)
-              }
-              disabled={busy || !recipe.is_active}
-              className="h-10 rounded-lg border border-(--color-light) bg-white px-3 text-sm font-semibold text-black outline-none focus:border-(--color-main)"
-            >
-              {STATUS_FILTERS.filter(option => option.value).map(option => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <button
-            type="button"
-            onClick={() =>
-              onChangeStatus(
-                recipe.pending_recipe_id,
-                nextStatus,
-                reason || undefined,
-              )
-            }
-            disabled={busy || !recipe.is_active || nextStatus === recipe.status}
-            className="mt-5 h-10 rounded-lg bg-(--color-main-ui) px-4 text-sm font-semibold text-white disabled:bg-slate-200 disabled:text-slate-500"
-          >
-            변경
-          </button>
-        </div>
-        <input
-          value={reason}
-          onChange={event => setReason(event.target.value)}
-          placeholder="거절로 변경할 때 사유"
-          disabled={!recipe.is_active}
-          className="w-full rounded-lg border border-(--color-light) px-3 py-2 text-sm outline-none focus:border-(--color-main)"
-        />
-        {!recipe.is_active && (
-          <div className="rounded-lg border border-red-100 bg-red-50 px-3 py-2">
+      {/* 상태 변경 영역 */}
+      <div className="space-y-2 border-t border-slate-100 px-4 py-3">
+        {!recipe.is_active ? (
+          <div className="rounded-lg border border-red-100 bg-red-50 px-3 py-2.5">
             <p className="text-xs leading-5 text-red-700">
-              삭제된 제출건입니다. 사용자가 볼 수 없으며, 필요한 경우 DB에서 완전히 삭제할 수 있습니다.
+              삭제된 제출건입니다. 사용자가 볼 수 없으며, 필요한 경우 DB에서
+              완전히 삭제할 수 있습니다.
             </p>
             <button
               type="button"
-              onClick={() => onHardDelete(recipe.pending_recipe_id)}
+              onClick={() => onHardDelete(recipe.user_recipe_id)}
               disabled={busy}
-              className="mt-2 h-9 w-full rounded-lg bg-red-600 px-3 text-sm font-semibold text-white disabled:bg-red-200"
+              className="mt-2 h-9 w-full rounded-lg bg-red-600 px-3 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:bg-red-200"
             >
               DB에서 삭제
             </button>
           </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-[1fr_auto] gap-2">
+              <label className="flex flex-col gap-1 text-xs font-semibold text-slate-500">
+                상태 변경
+                <select
+                  value={nextStatus}
+                  onChange={event =>
+                    setNextStatus(event.target.value as PendingRecipeStatus)
+                  }
+                  disabled={busy}
+                  className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none focus:border-(--color-main-ui)"
+                >
+                  {STATUS_FILTERS.filter(option => option.value).map(option => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button
+                type="button"
+                onClick={() =>
+                  onChangeStatus(
+                    recipe.user_recipe_id,
+                    nextStatus,
+                    reason || undefined,
+                  )
+                }
+                disabled={busy || nextStatus === recipe.status}
+                className="mt-5 h-9 rounded-lg bg-(--color-main-ui) px-4 text-sm font-semibold text-white transition-colors hover:bg-(--color-main) disabled:bg-slate-200 disabled:text-slate-400"
+              >
+                {busy ? '처리 중' : '변경'}
+              </button>
+            </div>
+            <input
+              value={reason}
+              onChange={event => setReason(event.target.value)}
+              placeholder="거절 사유 (REJECTED 선택 시)"
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs outline-none placeholder:text-slate-400 focus:border-(--color-main-ui)"
+            />
+          </>
         )}
       </div>
     </article>
@@ -324,8 +521,11 @@ function PendingRecipeCard({
 
 export default function RecipesPage() {
   const [recipes, setRecipes] = useState<PendingRecipe[]>([]);
-  const [statusFilter, setStatusFilter] = useState<PendingRecipeStatus | ''>('');
+  const [statusFilter, setStatusFilter] = useState<PendingRecipeStatus | ''>(
+    '',
+  );
   const [activeFilter, setActiveFilter] = useState<boolean | ''>(true);
+  const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -333,11 +533,16 @@ export default function RecipesPage() {
   async function load(
     nextStatus = statusFilter,
     nextActive = activeFilter,
+    q = searchQuery,
   ) {
     setLoading(true);
     setErrorMessage(null);
     try {
-      const data = await getPendingRecipes(nextStatus, nextActive);
+      const data = await getPendingRecipes(
+        nextStatus,
+        nextActive,
+        q || undefined,
+      );
       setRecipes(data);
     } catch (error) {
       setErrorMessage(
@@ -350,7 +555,13 @@ export default function RecipesPage() {
 
   useEffect(() => {
     void load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [statusFilter, activeFilter]);
+
+  function handleSearch(e: React.FormEvent) {
+    e.preventDefault();
+    void load(statusFilter, activeFilter, searchQuery);
+  }
 
   async function runStatusAction(
     id: number,
@@ -363,9 +574,10 @@ export default function RecipesPage() {
       const updated = await changePendingRecipeStatus(id, nextStatus, reason);
       setRecipes(current =>
         current.flatMap(recipe => {
-          if (recipe.pending_recipe_id !== id) return [recipe];
+          if (recipe.user_recipe_id !== id) return [recipe];
           if (statusFilter && updated.status !== statusFilter) return [];
-          if (activeFilter !== '' && updated.is_active !== activeFilter) return [];
+          if (activeFilter !== '' && updated.is_active !== activeFilter)
+            return [];
           return [updated];
         }),
       );
@@ -387,7 +599,7 @@ export default function RecipesPage() {
     try {
       await hardDeletePendingRecipe(id);
       setRecipes(current =>
-        current.filter(recipe => recipe.pending_recipe_id !== id),
+        current.filter(recipe => recipe.user_recipe_id !== id),
       );
     } catch (error) {
       setErrorMessage(getApiErrorMessage(error, '삭제를 처리하지 못했습니다.'));
@@ -396,85 +608,140 @@ export default function RecipesPage() {
     }
   }
 
+  const pendingCount = recipes.filter(
+    r => r.status === 'PENDING' && r.is_active,
+  ).length;
+
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      <header className="flex items-center justify-between border-b border-(--color-light) px-6 py-4">
-        <div>
-          <h1 className="text-lg font-bold text-black">제출 레시피 검수</h1>
-          <p className="mt-1 text-sm text-(--color-gray)">
-            원문을 기준으로 노출 가능 여부를 승인하고, 구조화 import 준비 상태는 별도로 확인합니다.
-          </p>
+      <header className="border-b border-slate-200 bg-white px-6 py-4">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h1 className="text-lg font-bold text-slate-900">
+              제출 레시피 검수
+              {pendingCount > 0 && (
+                <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-sm font-semibold text-amber-700">
+                  {pendingCount}
+                </span>
+              )}
+            </h1>
+            <p className="mt-0.5 text-sm text-slate-500">
+              원문을 기준으로 노출 가능 여부를 승인하고, Import 준비 상태를
+              확인합니다.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => void load()}
+            className="flex items-center gap-1.5 rounded-lg bg-(--color-main-ui) px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-(--color-main)"
+          >
+            <RefreshCw size={14} />
+            새로고침
+          </button>
         </div>
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          <div className="flex rounded-lg border border-(--color-light) bg-white p-1">
+
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          {/* 검색 */}
+          <form onSubmit={handleSearch} className="flex gap-1.5">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              placeholder="제목 또는 내용 검색"
+              className="h-9 rounded-lg border border-slate-200 px-3 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-(--color-main-ui)"
+            />
+            <button
+              type="submit"
+              className="flex h-9 items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-600 hover:bg-slate-50"
+            >
+              <Search size={14} />
+              검색
+            </button>
+          </form>
+
+          {/* 상태 필터 */}
+          <div className="flex rounded-lg border border-slate-200 bg-white p-1">
             {STATUS_FILTERS.map(option => (
               <button
                 key={option.value || 'ALL'}
                 type="button"
                 onClick={() => setStatusFilter(option.value)}
-                className={`rounded-md px-3 py-1.5 text-sm font-semibold ${
+                className={`rounded-md px-3 py-1.5 text-sm font-semibold transition-colors ${
                   statusFilter === option.value
                     ? 'bg-(--color-main-ui) text-white'
-                    : 'text-(--color-gray)'
+                    : 'text-slate-500 hover:text-slate-800'
                 }`}
               >
                 {option.label}
               </button>
             ))}
           </div>
-          <div className="flex rounded-lg border border-(--color-light) bg-white p-1">
+
+          {/* 활성 필터 */}
+          <div className="flex rounded-lg border border-slate-200 bg-white p-1">
             {ACTIVE_FILTERS.map(option => (
               <button
                 key={String(option.value)}
                 type="button"
                 onClick={() => setActiveFilter(option.value)}
-                className={`rounded-md px-3 py-1.5 text-sm font-semibold ${
+                className={`rounded-md px-3 py-1.5 text-sm font-semibold transition-colors ${
                   activeFilter === option.value
                     ? 'bg-(--color-main-ui) text-white'
-                    : 'text-(--color-gray)'
+                    : 'text-slate-500 hover:text-slate-800'
                 }`}
               >
                 {option.label}
               </button>
             ))}
           </div>
-          <button
-            type="button"
-            onClick={() => void load()}
-            className="rounded-lg bg-(--color-main-ui) px-4 py-2 text-sm font-semibold text-white"
-          >
-            새로고침
-          </button>
         </div>
       </header>
 
       {errorMessage && (
-        <p className="mx-6 mt-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">
+        <div className="mx-6 mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-700">
           {errorMessage}
-        </p>
+        </div>
       )}
 
       <div className="flex-1 overflow-y-auto px-6 py-5">
         {loading ? (
-          <p className="text-sm text-(--color-muted)">불러오는 중...</p>
-        ) : recipes.length === 0 ? (
-          <p className="text-sm text-(--color-muted)">
-            조건에 맞는 제출 레시피가 없습니다.
-          </p>
-        ) : (
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-2 2xl:grid-cols-3">
-            {recipes.map(recipe => (
-              <PendingRecipeCard
-                key={recipe.pending_recipe_id}
-                recipe={recipe}
-                busy={busyId === recipe.pending_recipe_id}
-                onChangeStatus={(id, nextStatus, reason) =>
-                  void runStatusAction(id, nextStatus, reason)
-                }
-                onHardDelete={id => void runHardDelete(id)}
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div
+                key={i}
+                className="h-96 animate-pulse rounded-xl border border-slate-200 bg-slate-100"
               />
             ))}
           </div>
+        ) : recipes.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20 text-center">
+            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100 text-3xl">
+              📋
+            </div>
+            <p className="text-sm font-semibold text-slate-600">
+              조건에 맞는 제출 레시피가 없습니다.
+            </p>
+            <p className="mt-1 text-xs text-slate-400">
+              필터를 변경하거나 새로고침해 보세요.
+            </p>
+          </div>
+        ) : (
+          <>
+            <p className="mb-3 text-xs text-slate-400">총 {recipes.length}건</p>
+            <div className="grid grid-cols-1 gap-4 xl:grid-cols-2 2xl:grid-cols-3">
+              {recipes.map(recipe => (
+                <PendingRecipeCard
+                  key={recipe.user_recipe_id}
+                  recipe={recipe}
+                  busy={busyId === recipe.user_recipe_id}
+                  onChangeStatus={(id, nextStatus, reason) =>
+                    void runStatusAction(id, nextStatus, reason)
+                  }
+                  onHardDelete={id => void runHardDelete(id)}
+                />
+              ))}
+            </div>
+          </>
         )}
       </div>
     </div>
