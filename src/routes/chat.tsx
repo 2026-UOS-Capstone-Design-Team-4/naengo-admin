@@ -1,3 +1,4 @@
+import { Image, Plus, Send } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
 import {
@@ -193,10 +194,11 @@ export default function ChatPage() {
         <div className="p-3">
           <button
             onClick={handleNewChat}
-            className="w-full rounded-xl bg-(--color-main) px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-(--color-main-ui) disabled:opacity-50"
+            className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-(--color-main) px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-(--color-main-ui) disabled:opacity-50"
             disabled={isLoading}
           >
-            + 새 채팅
+            <Plus size={15} />
+            새 채팅
           </button>
         </div>
         <div className="flex-1 overflow-y-auto px-2 pb-2">
@@ -244,8 +246,14 @@ export default function ChatPage() {
           className="min-h-100 flex-1 space-y-4 overflow-y-auto p-4"
         >
           {history.length === 0 && (
-            <div className="flex h-full items-center justify-center text-(--color-muted)">
-              재료를 알려주시면 레시피를 추천해드릴게요!
+            <div className="flex h-full flex-col items-center justify-center gap-3">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-(--color-lighter) text-3xl shadow-sm">
+                🍳
+              </div>
+              <div className="text-center">
+                <p className="font-semibold text-slate-700">냉장고 속 재료를 알려주세요</p>
+                <p className="mt-1 text-sm text-(--color-muted)">재료를 입력하면 딱 맞는 레시피를 추천해드릴게요!</p>
+              </div>
             </div>
           )}
           {history.map((item, index) => (
@@ -292,30 +300,32 @@ export default function ChatPage() {
 
           {isLoading && history[history.length - 1]?.role !== 'model' && (
             <div className="flex justify-start">
-              <div className="animate-pulse rounded-2xl rounded-tl-sm bg-(--color-light) px-4 py-2 text-black">
-                답변을 생성 중입니다...
+              <div className="flex items-center gap-1 rounded-2xl rounded-tl-sm bg-(--color-light) px-4 py-3">
+                <span className="h-2 w-2 animate-bounce rounded-full bg-(--color-main)" style={{ animationDelay: '0ms' }} />
+                <span className="h-2 w-2 animate-bounce rounded-full bg-(--color-main)" style={{ animationDelay: '150ms' }} />
+                <span className="h-2 w-2 animate-bounce rounded-full bg-(--color-main)" style={{ animationDelay: '300ms' }} />
               </div>
             </div>
           )}
         </div>
 
-        <div className="border-t border-(--color-light) p-4">
+        <div className="border-t border-(--color-light) bg-white px-4 pb-4 pt-3">
           {image && (
             <div className="mb-2 flex items-center gap-2">
               <img
                 src={image}
                 alt="미리보기"
-                className="h-16 w-16 rounded-xl object-cover"
+                className="h-16 w-16 rounded-xl object-cover ring-1 ring-(--color-light)"
               />
               <button
                 onClick={() => setImage(null)}
-                className="text-sm text-(--color-muted) hover:text-red-400"
+                className="rounded-full px-2 py-0.5 text-xs font-semibold text-(--color-muted) hover:bg-red-50 hover:text-red-500"
               >
                 ✕ 제거
               </button>
             </div>
           )}
-          <div className="flex gap-2">
+          <div className="flex items-end gap-2 rounded-2xl border border-(--color-light) bg-(--color-lightest) px-3 py-2 focus-within:border-(--color-main) focus-within:bg-white transition-colors">
             <input
               ref={fileInputRef}
               type="file"
@@ -326,26 +336,38 @@ export default function ChatPage() {
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={isLoading}
-              className="rounded-full border border-(--color-light) px-4 py-2 text-(--color-gray) transition-colors hover:border-(--color-main) hover:text-(--color-main) disabled:opacity-50"
+              title="이미지 첨부"
+              className="mb-0.5 shrink-0 rounded-full p-1.5 text-(--color-gray) transition-colors hover:bg-(--color-lighter) hover:text-(--color-main) disabled:opacity-40"
             >
-              📷
+              <Image size={16} />
             </button>
-            <input
-              type="text"
-              className="flex-1 rounded-full border border-(--color-light) bg-(--color-lightest) px-4 py-2 text-black focus:border-(--color-main) focus:outline-none"
+            <textarea
+              rows={1}
+              className="max-h-32 flex-1 resize-none bg-transparent py-1 text-sm text-black placeholder:text-(--color-muted) focus:outline-none"
               placeholder="재료를 입력하세요 (예: 양배추, 계란)"
               value={prompt}
-              onChange={e => setPrompt(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleSend()}
+              onChange={e => {
+                setPrompt(e.target.value);
+                e.target.style.height = 'auto';
+                e.target.style.height = `${e.target.scrollHeight}px`;
+              }}
+              onKeyDown={e => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  void handleSend();
+                }
+              }}
             />
             <button
               onClick={handleSend}
-              disabled={isLoading}
-              className="rounded-full bg-(--color-main-ui) px-6 py-2 font-semibold text-white transition-colors hover:bg-(--color-main) disabled:bg-(--color-muted)"
+              disabled={isLoading || (!prompt.trim() && !image)}
+              className="mb-0.5 shrink-0 rounded-full bg-(--color-main-ui) p-2 text-white transition-colors hover:bg-(--color-main) disabled:bg-(--color-muted)"
+              title="전송 (Enter)"
             >
-              전송
+              <Send size={15} />
             </button>
           </div>
+          <p className="mt-1.5 text-center text-[10px] text-(--color-muted)">Enter로 전송, Shift+Enter로 줄바꿈</p>
         </div>
       </div>
     </div>
