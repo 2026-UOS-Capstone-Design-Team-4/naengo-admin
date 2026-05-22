@@ -11,7 +11,6 @@ import {
 import {
   PendingRecipe,
   PendingRecipeStatus,
-  RecipeDraftPayload,
 } from '@/components/RecipeCard';
 
 const STATUS_FILTERS: Array<{
@@ -54,45 +53,6 @@ const DIFFICULTY_LABEL: Record<string, string> = {
   hard: '어려움',
 };
 
-function toStringList(value: unknown): string[] {
-  if (Array.isArray(value)) {
-    return value
-      .map(item => {
-        if (typeof item === 'string') return item;
-        if (item == null) return '';
-        return String(item);
-      })
-      .map(item => item.trim())
-      .filter(Boolean);
-  }
-  if (typeof value === 'string') {
-    return value
-      .split(',')
-      .map(item => item.trim())
-      .filter(Boolean);
-  }
-  if (value && typeof value === 'object') {
-    return Object.values(value)
-      .filter(item => typeof item === 'string' || typeof item === 'number')
-      .map(item => String(item).trim())
-      .filter(Boolean);
-  }
-  return [];
-}
-
-function toText(value: unknown): string {
-  if (Array.isArray(value)) return value.map(toText).filter(Boolean).join(', ');
-  if (value == null) return '';
-  return String(value);
-}
-
-function toInstructionText(
-  item: string | { instruction?: string | null },
-): string {
-  if (typeof item === 'string') return item;
-  return item.instruction ?? '';
-}
-
 function formatDate(value?: string | null) {
   if (!value) return '-';
   return new Intl.DateTimeFormat('ko-KR', {
@@ -101,149 +61,6 @@ function formatDate(value?: string | null) {
     hour: '2-digit',
     minute: '2-digit',
   }).format(new Date(value));
-}
-
-function hasDiff(
-  draft: RecipeDraftPayload,
-  patch: RecipeDraftPayload,
-): boolean {
-  return JSON.stringify(draft) !== JSON.stringify(patch);
-}
-
-function getDiffFields(
-  draft: RecipeDraftPayload,
-  patch: RecipeDraftPayload,
-): Set<string> {
-  const keys = new Set([...Object.keys(draft), ...Object.keys(patch)]);
-  const changed = new Set<string>();
-  keys.forEach(key => {
-    if (
-      JSON.stringify(draft[key as keyof RecipeDraftPayload]) !==
-      JSON.stringify(patch[key as keyof RecipeDraftPayload])
-    ) {
-      changed.add(key);
-    }
-  });
-  return changed;
-}
-
-function DraftContent({
-  draft,
-  diffFields,
-}: {
-  draft: RecipeDraftPayload;
-  diffFields?: Set<string>;
-}) {
-  const categories = toStringList(draft.category);
-  const instructions = draft.instructions ?? [];
-  const isDiff = (field: string) => diffFields?.has(field);
-
-  return (
-    <div className="space-y-2.5 text-xs">
-      {draft.description && (
-        <p
-          className={`leading-5 text-slate-600 ${isDiff('description') ? 'rounded bg-amber-50 px-2 py-1 ring-1 ring-amber-200' : ''}`}
-        >
-          {draft.description}
-        </p>
-      )}
-
-      <div className="grid grid-cols-2 gap-2">
-        {draft.servings != null && (
-          <div
-            className={`rounded border border-slate-200 bg-slate-50 px-2.5 py-1.5 ${isDiff('servings') ? 'border-amber-200 bg-amber-50' : ''}`}
-          >
-            <p className="text-[10px] font-semibold text-slate-400">인분</p>
-            <p className="mt-0.5 font-semibold text-slate-800">
-              {draft.servings}
-            </p>
-          </div>
-        )}
-        {draft.cooking_time_minutes != null && (
-          <div
-            className={`rounded border border-slate-200 bg-slate-50 px-2.5 py-1.5 ${isDiff('cooking_time_minutes') ? 'border-amber-200 bg-amber-50' : ''}`}
-          >
-            <p className="text-[10px] font-semibold text-slate-400">
-              조리 시간
-            </p>
-            <p className="mt-0.5 font-semibold text-slate-800">
-              {draft.cooking_time_minutes}분
-            </p>
-          </div>
-        )}
-        {draft.kcal_per_serving != null && (
-          <div
-            className={`rounded border border-slate-200 bg-slate-50 px-2.5 py-1.5 ${isDiff('kcal_per_serving') ? 'border-amber-200 bg-amber-50' : ''}`}
-          >
-            <p className="text-[10px] font-semibold text-slate-400">칼로리</p>
-            <p className="mt-0.5 font-semibold text-slate-800">
-              {draft.kcal_per_serving}kcal
-            </p>
-          </div>
-        )}
-        {draft.difficulty && (
-          <div
-            className={`rounded border border-slate-200 bg-slate-50 px-2.5 py-1.5 ${isDiff('difficulty') ? 'border-amber-200 bg-amber-50' : ''}`}
-          >
-            <p className="text-[10px] font-semibold text-slate-400">난이도</p>
-            <p className="mt-0.5 font-semibold text-slate-800">
-              {DIFFICULTY_LABEL[draft.difficulty] ?? draft.difficulty}
-            </p>
-          </div>
-        )}
-      </div>
-
-      {draft.ingredients_raw && (
-        <div
-          className={`rounded border border-slate-200 px-2.5 py-1.5 ${isDiff('ingredients_raw') ? 'border-amber-200 bg-amber-50' : 'bg-slate-50'}`}
-        >
-          <p className="mb-1 text-[10px] font-semibold text-slate-400">
-            재료 원문
-          </p>
-          <p className="line-clamp-2 text-slate-600">
-            {toText(draft.ingredients_raw)}
-          </p>
-        </div>
-      )}
-
-      {instructions.length > 0 && (
-        <div
-          className={
-            isDiff('instructions')
-              ? 'rounded bg-amber-50 px-2 py-1 ring-1 ring-amber-200'
-              : ''
-          }
-        >
-          <p className="mb-1 text-[10px] font-semibold text-slate-400">
-            조리 순서
-          </p>
-          <ol className="list-decimal space-y-1 pl-4 text-slate-600">
-            {instructions.slice(0, 3).map((step, index) => (
-              <li key={String(index)}>{toInstructionText(step)}</li>
-            ))}
-            {instructions.length > 3 && (
-              <li className="text-slate-400">
-                +{instructions.length - 3}개 더...
-              </li>
-            )}
-          </ol>
-        </div>
-      )}
-
-      {categories.length > 0 && (
-        <div className="flex flex-wrap gap-1">
-          {categories.map(category => (
-            <span
-              key={category}
-              className="rounded-full bg-(--color-lighter) px-2 py-0.5 text-[10px] font-semibold text-(--color-main-ui) ring-1 ring-(--color-light)"
-            >
-              {category}
-            </span>
-          ))}
-        </div>
-      )}
-    </div>
-  );
 }
 
 function PendingRecipeCard({
@@ -265,17 +82,9 @@ function PendingRecipeCard({
   const [nextStatus, setNextStatus] = useState<PendingRecipeStatus>(
     recipe.status,
   );
-  const [activeTab, setActiveTab] = useState<'draft' | 'ai'>('draft');
 
   const missingLabels = getMissingFieldLabels(recipe);
   const isImportReady = missingLabels.length === 0;
-
-  const draft = recipe.draft_payload;
-  const aiPatch = recipe.ai_suggested_patch as RecipeDraftPayload;
-  const hasPatchDiff = aiPatch && hasDiff(draft, aiPatch);
-  const diffFields = hasPatchDiff
-    ? getDiffFields(draft, aiPatch)
-    : new Set<string>();
 
   useEffect(() => {
     setNextStatus(recipe.status);
@@ -326,109 +135,216 @@ function PendingRecipeCard({
       </div>
 
       <div className="flex-1 space-y-3 overflow-y-auto px-4 py-3">
-        {/* 제출 원문 */}
-        <section className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5">
-          <div className="mb-1.5 flex items-center justify-between gap-2">
-            <h3 className="text-xs font-semibold text-slate-700">제출 원문</h3>
-            <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold text-(--color-main-ui) ring-1 ring-(--color-light)">
-              승인 기준
-            </span>
-          </div>
-          <p className="max-h-28 overflow-y-auto text-xs leading-5 whitespace-pre-wrap text-slate-600">
-            {recipe.submission_text}
+        {/* 이미지 */}
+        {recipe.main_image_url && (
+          <img
+            src={recipe.main_image_url}
+            alt={recipe.title}
+            className="aspect-video w-full rounded-lg object-cover"
+          />
+        )}
+
+        {/* 설명 */}
+        {recipe.description && (
+          <p className="text-xs leading-5 whitespace-pre-wrap text-slate-600">
+            {recipe.description}
           </p>
-        </section>
+        )}
 
-        {/* Draft / AI 제안 탭 */}
-        <section className="rounded-lg border border-dashed border-slate-200 px-3 py-2.5">
-          <div className="mb-2.5 flex items-center justify-between gap-2">
-            <div className="flex items-center gap-1 rounded-full bg-slate-100 p-0.5">
-              <button
-                type="button"
-                onClick={() => setActiveTab('draft')}
-                className={`rounded-full px-3 py-1 text-xs font-semibold transition-all ${
-                  activeTab === 'draft'
-                    ? 'bg-white text-slate-900 shadow-sm'
-                    : 'text-slate-500 hover:text-slate-700'
-                }`}
-              >
-                Draft
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab('ai')}
-                className={`flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold transition-all ${
-                  activeTab === 'ai'
-                    ? 'bg-white text-slate-900 shadow-sm'
-                    : 'text-slate-500 hover:text-slate-700'
-                }`}
-              >
-                AI 제안
-                {hasPatchDiff && (
-                  <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
-                )}
-              </button>
-            </div>
-            <span
-              className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ${
-                isImportReady
-                  ? 'bg-emerald-50 text-emerald-700 ring-emerald-200'
-                  : 'bg-amber-50 text-amber-700 ring-amber-200'
-              }`}
-            >
-              {isImportReady ? 'Import 준비됨' : '보완 필요'}
-            </span>
-          </div>
-
-          {activeTab === 'draft' ? (
-            <DraftContent draft={draft} />
-          ) : (
-            <div>
-              {hasPatchDiff ? (
-                <div>
-                  <p className="mb-2 text-[10px] font-semibold text-amber-600">
-                    ▲ {diffFields.size}개 필드 변경 제안
-                  </p>
-                  <DraftContent draft={aiPatch} diffFields={diffFields} />
-                </div>
-              ) : (
-                <p className="text-xs text-slate-400">Draft와 동일합니다.</p>
-              )}
+        {/* 기본 정보 */}
+        <div className="grid grid-cols-2 gap-2">
+          {recipe.servings != null && (
+            <div className="rounded border border-slate-200 bg-slate-50 px-2.5 py-1.5">
+              <p className="text-[10px] font-semibold text-slate-400">인분</p>
+              <p className="mt-0.5 text-xs font-semibold text-slate-800">
+                {recipe.servings}
+              </p>
             </div>
           )}
-        </section>
+          {recipe.cooking_time_minutes != null && (
+            <div className="rounded border border-slate-200 bg-slate-50 px-2.5 py-1.5">
+              <p className="text-[10px] font-semibold text-slate-400">
+                조리 시간
+              </p>
+              <p className="mt-0.5 text-xs font-semibold text-slate-800">
+                {recipe.cooking_time_minutes}분
+              </p>
+            </div>
+          )}
+          {recipe.kcal_per_serving != null && (
+            <div className="rounded border border-slate-200 bg-slate-50 px-2.5 py-1.5">
+              <p className="text-[10px] font-semibold text-slate-400">칼로리</p>
+              <p className="mt-0.5 text-xs font-semibold text-slate-800">
+                {recipe.kcal_per_serving}kcal
+              </p>
+            </div>
+          )}
+          {recipe.difficulty && (
+            <div className="rounded border border-slate-200 bg-slate-50 px-2.5 py-1.5">
+              <p className="text-[10px] font-semibold text-slate-400">난이도</p>
+              <p className="mt-0.5 text-xs font-semibold text-slate-800">
+                {DIFFICULTY_LABEL[recipe.difficulty] ?? recipe.difficulty}
+              </p>
+            </div>
+          )}
+        </div>
 
-        {/* 검증 오류 */}
-        {recipe.validation_errors.length > 0 && (
-          <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2">
-            <p className="mb-1 text-xs font-semibold text-red-700">검증 오류</p>
-            <ul className="space-y-0.5">
-              {recipe.validation_errors.map((e, i) => (
-                <li key={i} className="text-xs text-red-600">
-                  {e.message}
-                </li>
-              ))}
-            </ul>
+        {/* 카테고리 / 태그 */}
+        {(recipe.category.length > 0 || recipe.tags.length > 0) && (
+          <div className="flex flex-wrap gap-1">
+            {recipe.category.map(cat => (
+              <span
+                key={cat}
+                className="rounded-full bg-(--color-lighter) px-2 py-0.5 text-[10px] font-semibold text-(--color-main-ui) ring-1 ring-(--color-light)"
+              >
+                {cat}
+              </span>
+            ))}
+            {recipe.tags.map(tag => (
+              <span
+                key={tag}
+                className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500"
+              >
+                #{tag}
+              </span>
+            ))}
           </div>
         )}
 
-        {/* 관리자 메모 / 거절 사유 */}
-        {(recipe.admin_note || recipe.rejection_reason) && (
+        {/* 재료 */}
+        {recipe.ingredients.length > 0 && (
+          <section className="rounded-lg border border-slate-200">
+            <h3 className="border-b border-slate-100 px-3 py-2 text-xs font-semibold text-slate-700">
+              재료
+            </h3>
+            <div>
+              {recipe.ingredients.map((ingredient, i) => (
+                <div
+                  key={i}
+                  className="grid grid-cols-[1fr_auto] border-b border-slate-100 px-3 py-1.5 text-xs last:border-0"
+                >
+                  <span className="text-slate-800">
+                    {ingredient.name}
+                    {ingredient.is_optional && (
+                      <span className="ml-1 text-slate-400">(선택)</span>
+                    )}
+                  </span>
+                  <span className="text-slate-500">
+                    {ingredient.amount_text || ''}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* 조리 순서 */}
+        {recipe.steps.length > 0 && (
+          <section>
+            <h3 className="mb-1.5 text-xs font-semibold text-slate-700">
+              조리 순서
+            </h3>
+            <ol className="space-y-1.5">
+              {recipe.steps.map(step => (
+                <li
+                  key={step.step_no}
+                  className="rounded-lg border border-slate-200 px-3 py-2 text-xs"
+                >
+                  <p className="font-semibold text-slate-500">
+                    Step {step.step_no}
+                  </p>
+                  <p className="mt-0.5 leading-5 text-slate-800">
+                    {step.instruction}
+                  </p>
+                  {step.tip && (
+                    <p className="mt-0.5 text-slate-400 italic">
+                      Tip: {step.tip}
+                    </p>
+                  )}
+                </li>
+              ))}
+            </ol>
+          </section>
+        )}
+
+        {/* 팁 / 주의사항 */}
+        {(recipe.tips.length > 0 || recipe.warnings.length > 0) && (
+          <section className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5">
+            {recipe.tips.length > 0 && (
+              <>
+                <p className="text-[10px] font-semibold text-slate-500">팁</p>
+                <ul className="mt-1 list-disc space-y-0.5 pl-4 text-xs text-slate-600">
+                  {recipe.tips.map((tip, i) => (
+                    <li key={i}>{tip}</li>
+                  ))}
+                </ul>
+              </>
+            )}
+            {recipe.warnings.length > 0 && (
+              <div className={recipe.tips.length > 0 ? 'mt-2' : ''}>
+                <p className="text-[10px] font-semibold text-slate-500">
+                  주의사항
+                </p>
+                <ul className="mt-1 list-disc space-y-0.5 pl-4 text-xs text-amber-700">
+                  {recipe.warnings.map((w, i) => (
+                    <li key={i}>{w}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </section>
+        )}
+
+        {/* 영양 정보 */}
+        {recipe.nutrition && (
           <section className="rounded-lg border border-slate-200 px-3 py-2.5">
-            {recipe.admin_note && (
-              <p className="text-xs whitespace-pre-wrap text-slate-600">
-                <span className="font-semibold text-slate-900">
-                  관리자 메모:{' '}
-                </span>
-                {recipe.admin_note}
-              </p>
-            )}
-            {recipe.rejection_reason && (
-              <p className="mt-1 text-xs whitespace-pre-wrap text-red-600">
-                <span className="font-semibold">거절 사유: </span>
-                {recipe.rejection_reason}
-              </p>
-            )}
+            <p className="mb-1.5 text-[10px] font-semibold text-slate-500">
+              영양 정보
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              {recipe.nutrition.carbohydrate_grams != null && (
+                <div className="rounded bg-slate-50 px-2 py-1">
+                  <p className="text-[10px] text-slate-400">탄수화물</p>
+                  <p className="text-xs font-semibold text-slate-700">
+                    {recipe.nutrition.carbohydrate_grams}g
+                  </p>
+                </div>
+              )}
+              {recipe.nutrition.protein_grams != null && (
+                <div className="rounded bg-slate-50 px-2 py-1">
+                  <p className="text-[10px] text-slate-400">단백질</p>
+                  <p className="text-xs font-semibold text-slate-700">
+                    {recipe.nutrition.protein_grams}g
+                  </p>
+                </div>
+              )}
+              {recipe.nutrition.fat_grams != null && (
+                <div className="rounded bg-slate-50 px-2 py-1">
+                  <p className="text-[10px] text-slate-400">지방</p>
+                  <p className="text-xs font-semibold text-slate-700">
+                    {recipe.nutrition.fat_grams}g
+                  </p>
+                </div>
+              )}
+              {recipe.nutrition.sodium_milligrams != null && (
+                <div className="rounded bg-slate-50 px-2 py-1">
+                  <p className="text-[10px] text-slate-400">나트륨</p>
+                  <p className="text-xs font-semibold text-slate-700">
+                    {recipe.nutrition.sodium_milligrams}mg
+                  </p>
+                </div>
+              )}
+            </div>
+          </section>
+        )}
+
+        {/* 거절 사유 */}
+        {recipe.rejection_reason && (
+          <section className="rounded-lg border border-slate-200 px-3 py-2.5">
+            <p className="text-xs whitespace-pre-wrap text-red-600">
+              <span className="font-semibold">거절 사유: </span>
+              {recipe.rejection_reason}
+            </p>
           </section>
         )}
 

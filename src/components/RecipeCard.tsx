@@ -15,21 +15,37 @@ export interface IngredientItem {
   note?: string | null;
 }
 
-export interface RecipeDraftPayload {
-  title?: string | null;
-  description?: string | null;
-  ingredients?: IngredientItem[] | null;
-  ingredients_raw?: string | string[] | null;
-  instructions?: Array<string | RecipeStep> | null;
-  servings?: number | null;
-  cooking_time_minutes?: number | null;
-  kcal_per_serving?: number | null;
-  difficulty?: 'easy' | 'normal' | 'hard' | null;
-  category?: string | string[] | Record<string, unknown> | null;
-  tags?: string | string[] | null;
-  tips?: string | string[] | null;
-  video_url?: string | null;
+export interface UserRecipeIngredient {
+  user_recipe_ingredient_id?: number | null;
+  group_name?: string | null;
+  name: string;
+  normalized_name?: string | null;
+  amount_text?: string | null;
+  quantity?: number | null;
+  unit?: string | null;
+  note?: string | null;
+  raw_text?: string | null;
+  is_optional: boolean;
+  sort_order: number;
+}
+
+export interface UserRecipeStep {
+  user_recipe_step_id?: number | null;
+  step_no: number;
+  instruction: string;
   image_url?: string | null;
+  tip?: string | null;
+  sort_order: number;
+}
+
+export interface UserRecipeNutrition {
+  serving_weight_grams?: number | null;
+  carbohydrate_grams?: number | null;
+  protein_grams?: number | null;
+  fat_grams?: number | null;
+  sodium_milligrams?: number | null;
+  source: string;
+  raw: Record<string, unknown>;
 }
 
 export interface Recipe {
@@ -65,14 +81,25 @@ export interface PendingRecipe {
   user_recipe_id: number;
   user_id: number;
   title: string;
-  submission_text: string;
-  draft_payload: RecipeDraftPayload;
-  ai_suggested_patch: Partial<RecipeDraftPayload>;
-  validation_errors: Array<{ field: string; message: string }>;
+  description?: string | null;
+  servings?: number | null;
+  yield_quantity?: number | null;
+  yield_unit?: string | null;
+  cooking_time_minutes?: number | null;
+  kcal_per_serving?: number | null;
+  difficulty?: string | null;
+  source_url?: string | null;
+  main_image_url?: string | null;
+  category: string[];
+  tags: string[];
+  tips: string[];
+  warnings: string[];
+  ingredients: UserRecipeIngredient[];
+  steps: UserRecipeStep[];
+  nutrition?: UserRecipeNutrition | null;
   status: PendingRecipeStatus;
   import_status: PendingRecipeImportStatus;
   is_active: boolean;
-  admin_note?: string | null;
   rejection_reason?: string | null;
   reviewed_by?: number | null;
   reviewed_at?: string | null;

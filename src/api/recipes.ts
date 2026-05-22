@@ -1,8 +1,19 @@
 import {
   PendingRecipe,
   PendingRecipeStatus,
-  RecipeDraftPayload,
+  UserRecipeIngredient,
+  UserRecipeNutrition,
+  UserRecipeStep,
 } from '@/components/RecipeCard';
+
+export interface UserRecipeLabel {
+  user_recipe_label_id?: number | null;
+  label_type: string;
+  label_value: string;
+  confidence_score?: number | null;
+  source?: string;
+  sort_order?: number;
+}
 
 import client from './client';
 
@@ -27,11 +38,20 @@ export async function getPendingRecipes(
 
 export interface PendingRecipeUpdatePayload {
   title?: string | null;
-  submission_text?: string | null;
-  draft_payload?: RecipeDraftPayload | null;
-  ai_suggested_patch?: RecipeDraftPayload | null;
+  description?: string | null;
+  servings?: number | null;
+  yield_quantity?: number | null;
+  yield_unit?: string | null;
+  cooking_time_minutes?: number | null;
+  kcal_per_serving?: number | null;
+  difficulty?: string | null;
+  source_url?: string | null;
+  main_image_url?: string | null;
+  ingredients?: UserRecipeIngredient[] | null;
+  steps?: UserRecipeStep[] | null;
+  labels?: UserRecipeLabel[] | null;
+  nutrition?: UserRecipeNutrition | null;
   status?: PendingRecipeStatus | null;
-  admin_note?: string | null;
   rejection_reason?: string | null;
 }
 
@@ -84,24 +104,22 @@ export async function updatePendingRecipe(
   return patchPendingRecipe(id, safe);
 }
 
-const REQUIRED_DRAFT_FIELDS = [
+const REQUIRED_RECIPE_FIELDS = [
   'description',
   'ingredients',
-  'ingredients_raw',
-  'instructions',
+  'steps',
   'servings',
   'cooking_time_minutes',
   'difficulty',
   'category',
 ] as const;
 
-type RequiredDraftField = (typeof REQUIRED_DRAFT_FIELDS)[number];
+type RequiredRecipeField = (typeof REQUIRED_RECIPE_FIELDS)[number];
 
-const DRAFT_FIELD_LABEL: Record<RequiredDraftField, string> = {
+const RECIPE_FIELD_LABEL: Record<RequiredRecipeField, string> = {
   description: '설명',
   ingredients: '재료',
-  ingredients_raw: '재료 원문',
-  instructions: '조리 순서',
+  steps: '조리 순서',
   servings: '인분',
   cooking_time_minutes: '조리 시간',
   difficulty: '난이도',
@@ -116,8 +134,7 @@ function isEmpty(value: unknown): boolean {
 }
 
 export function getMissingFieldLabels(recipe: PendingRecipe): string[] {
-  const payload = recipe.draft_payload;
-  return REQUIRED_DRAFT_FIELDS.filter(field =>
-    isEmpty(payload[field as keyof RecipeDraftPayload]),
-  ).map(field => DRAFT_FIELD_LABEL[field]);
+  return REQUIRED_RECIPE_FIELDS.filter(field =>
+    isEmpty(recipe[field as keyof PendingRecipe]),
+  ).map(field => RECIPE_FIELD_LABEL[field]);
 }
