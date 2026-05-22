@@ -22,12 +22,16 @@ export interface AdminRecipeListItem {
   title: string;
   summary?: string | null;
   servings: number;
+  yield_quantity?: number | null;
+  yield_unit?: string | null;
   cooking_time_minutes: number;
   kcal_per_serving?: number | null;
   difficulty: string;
   visibility: AdminRecipeVisibility | string;
   author_type: AdminRecipeAuthorType | string;
   source_id?: number | null;
+  source_url?: string | null;
+  main_image_url?: string | null;
   source_site?: string | null;
   source_recipe_id?: string | null;
   source_record_id?: string | null;
@@ -61,6 +65,7 @@ export interface AdminRecipeStep {
   step_id: number;
   step_no: number;
   instruction: string;
+  image_url?: string | null;
   tip?: string | null;
   sort_order: number;
 }
@@ -106,31 +111,11 @@ export interface AdminRecipeClassification {
   updated_at?: string | null;
 }
 
-export interface AdminRecipeMedia {
-  media_id: number;
-  step_id?: number | null;
-  media_type: string;
-  image_role?: string | null;
-  source_url?: string | null;
-  storage_url: string;
-  thumbnail_url?: string | null;
-  width?: number | null;
-  height?: number | null;
-  file_size_bytes?: number | null;
-  mime_type?: string | null;
-  storage_provider: string;
-  generation_id?: number | null;
-  is_primary: boolean;
-  sort_order: number;
-  created_at?: string | null;
-}
-
 export interface AdminRecipeDetail extends AdminRecipeListItem {
   description: string;
   author_id?: number | null;
   source_author_name?: string | null;
   source_author_url?: string | null;
-  source_url?: string | null;
   source_organization?: string | null;
   source_license?: string | null;
   source_license_url?: string | null;
@@ -144,7 +129,6 @@ export interface AdminRecipeDetail extends AdminRecipeListItem {
   labels: AdminRecipeLabel[];
   nutrition?: AdminRecipeNutrition | null;
   classification?: AdminRecipeClassification | null;
-  media: AdminRecipeMedia[];
 }
 
 export interface AdminRecipeListResponse {

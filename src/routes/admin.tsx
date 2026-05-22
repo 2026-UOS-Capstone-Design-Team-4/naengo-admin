@@ -180,12 +180,7 @@ function Metric({
 }
 
 function DetailPanel({ detail }: { detail: AdminRecipeDetail | null }) {
-  const primaryImage = useMemo(
-    () =>
-      detail?.media.find(item => item.is_primary)?.storage_url ??
-      detail?.media[0]?.storage_url,
-    [detail],
-  );
+  const primaryImage = detail?.main_image_url;
 
   if (!detail) {
     return (
@@ -307,6 +302,13 @@ function DetailPanel({ detail }: { detail: AdminRecipeDetail | null }) {
                 <p className="mt-1 leading-6 text-slate-800">
                   {step.instruction}
                 </p>
+                {step.image_url && (
+                  <img
+                    src={step.image_url}
+                    alt={`Step ${step.step_no}`}
+                    className="mt-2 rounded"
+                  />
+                )}
                 {step.tip && (
                   <p className="mt-1 text-xs text-slate-500">Tip: {step.tip}</p>
                 )}
