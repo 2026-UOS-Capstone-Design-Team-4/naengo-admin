@@ -1,5 +1,5 @@
 import { RefreshCw } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import {
   AdminRecipeDetail,
@@ -358,6 +358,8 @@ export default function AdminPage() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const listRequestIdRef = useRef(0);
+  const detailRequestIdRef = useRef(0);
 
   const selectedRecipe = useMemo(
     () => recipes.find(recipe => recipe.recipe_id === selectedId) ?? null,
@@ -375,12 +377,14 @@ export default function AdminPage() {
       } else {
         setLoading(true);
       }
+      const requestId = ++listRequestIdRef.current;
       setErrorMessage(null);
       try {
         const data = await getAdminRecipes({
           ...nextFilters,
           cursor: options.cursor,
         });
+        if (requestId !== listRequestIdRef.current) return;
         setNextCursor(data.next_cursor);
         setHasNext(data.has_next);
         if (append) {
@@ -399,10 +403,12 @@ export default function AdminPage() {
           }
         }
       } catch (error) {
+        if (requestId !== listRequestIdRef.current) return;
         setErrorMessage(
           getApiErrorMessage(error, '운영 레시피 목록을 불러오지 못했습니다.'),
         );
       } finally {
+        if (requestId !== listRequestIdRef.current) return;
         if (append) {
           setLoadingMore(false);
         } else {
@@ -415,10 +421,14 @@ export default function AdminPage() {
 
   const loadDetail = useCallback(async (recipeId: number) => {
     setDetailLoading(true);
+    const requestId = ++detailRequestIdRef.current;
     setErrorMessage(null);
     try {
-      setDetail(await getAdminRecipe(recipeId));
+      const nextDetail = await getAdminRecipe(recipeId);
+      if (requestId !== detailRequestIdRef.current) return;
+      setDetail(nextDetail);
     } catch (error) {
+      if (requestId !== detailRequestIdRef.current) return;
       setErrorMessage(
         getApiErrorMessage(
           error,
@@ -426,6 +436,7 @@ export default function AdminPage() {
         ),
       );
     } finally {
+      if (requestId !== detailRequestIdRef.current) return;
       setDetailLoading(false);
     }
   }, []);
@@ -444,7 +455,6 @@ export default function AdminPage() {
   ) {
     const next = { ...filters, [key]: value };
     setFilters(next);
-    void loadRecipes(next);
   }
 
   function loadNextPage() {
