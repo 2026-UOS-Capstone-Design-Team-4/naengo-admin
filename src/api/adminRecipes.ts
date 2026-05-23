@@ -149,6 +149,9 @@ export async function getAdminRecipes(
   const { data } = await client.get<AdminRecipeListResponse>('/admin/recipes', {
     params: cleanParams({ limit: 100, sort: 'latest', ...filters }),
   });
+  if (!Array.isArray(data.items)) {
+    throw new Error('Invalid admin recipe list response');
+  }
   return data;
 }
 
