@@ -33,6 +33,9 @@ export async function getPendingRecipes(
       },
     },
   );
+  if (!Array.isArray(data.items)) {
+    throw new Error('Invalid pending recipe list response');
+  }
   return data.items;
 }
 
