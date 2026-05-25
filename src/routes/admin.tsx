@@ -127,8 +127,10 @@ function RecipeRow({
     <button
       type="button"
       onClick={onClick}
-      className={`grid w-full min-w-[50rem] grid-cols-[5rem_1fr_6rem_7rem_7rem_6rem_7rem] items-center gap-3 border-b border-slate-100 px-4 py-3 text-left text-sm transition-colors hover:bg-slate-50 ${
-        selected ? 'border-l-2 border-l-(--color-main) bg-(--color-lighter)' : 'bg-white'
+      className={`grid w-full min-w-200 grid-cols-[5rem_1fr_6rem_7rem_7rem_6rem_7rem] items-center gap-3 border-b border-slate-100 px-4 py-3 text-left text-sm transition-colors hover:bg-slate-50 ${
+        selected
+          ? 'border-l-2 border-l-(--color-main) bg-(--color-lighter)'
+          : 'bg-white'
       }`}
     >
       <span className="font-mono text-xs text-slate-500">
@@ -408,11 +410,12 @@ export default function AdminPage() {
           getApiErrorMessage(error, '운영 레시피 목록을 불러오지 못했습니다.'),
         );
       } finally {
-        if (requestId !== listRequestIdRef.current) return;
-        if (append) {
-          setLoadingMore(false);
-        } else {
-          setLoading(false);
+        if (requestId === listRequestIdRef.current) {
+          if (append) {
+            setLoadingMore(false);
+          } else {
+            setLoading(false);
+          }
         }
       }
     },
@@ -436,16 +439,19 @@ export default function AdminPage() {
         ),
       );
     } finally {
-      if (requestId !== detailRequestIdRef.current) return;
-      setDetailLoading(false);
+      if (requestId === detailRequestIdRef.current) {
+        setDetailLoading(false);
+      }
     }
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadRecipes();
   }, [loadRecipes]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (selectedId) void loadDetail(selectedId);
   }, [loadDetail, selectedId]);
 
@@ -478,7 +484,7 @@ export default function AdminPage() {
           <button
             type="button"
             onClick={() => void loadRecipes()}
-            className="flex items-center gap-1.5 h-9 rounded-lg bg-(--color-main-ui) px-4 text-sm font-bold text-white transition-colors hover:bg-(--color-main)"
+            className="flex h-9 items-center gap-1.5 rounded-lg bg-(--color-main-ui) px-4 text-sm font-bold text-white transition-colors hover:bg-(--color-main)"
           >
             <RefreshCw size={14} />
             새로고침
@@ -562,7 +568,7 @@ export default function AdminPage() {
       <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_minmax(20rem,28rem)] overflow-hidden">
         <section className="min-w-0 overflow-hidden bg-white">
           <div className="h-full overflow-auto pb-20">
-            <div className="grid min-w-[50rem] grid-cols-[5rem_1fr_6rem_7rem_7rem_6rem_7rem] gap-3 border-b border-slate-200 bg-slate-50 px-4 py-2 text-xs font-bold tracking-wide text-slate-500">
+            <div className="grid min-w-200 grid-cols-[5rem_1fr_6rem_7rem_7rem_6rem_7rem] gap-3 border-b border-slate-200 bg-slate-50 px-4 py-2 text-xs font-bold tracking-wide text-slate-500">
               <span>번호</span>
               <span>제목</span>
               <span>시간</span>
@@ -572,9 +578,12 @@ export default function AdminPage() {
               <span>생성일</span>
             </div>
             {loading ? (
-              <div className="min-w-[50rem]">
+              <div className="min-w-200">
                 {Array.from({ length: 10 }).map((_, i) => (
-                  <div key={i} className="grid grid-cols-[5rem_1fr_6rem_7rem_7rem_6rem_7rem] gap-3 border-b border-slate-100 px-4 py-3">
+                  <div
+                    key={i}
+                    className="grid grid-cols-[5rem_1fr_6rem_7rem_7rem_6rem_7rem] gap-3 border-b border-slate-100 px-4 py-3"
+                  >
                     <div className="h-4 w-10 animate-pulse rounded bg-slate-200" />
                     <div className="h-4 w-48 animate-pulse rounded bg-slate-200" />
                     <div className="h-4 w-10 animate-pulse rounded bg-slate-200" />
@@ -600,7 +609,7 @@ export default function AdminPage() {
                   />
                 ))}
                 {hasNext && (
-                  <div className="min-w-[50rem] border-t border-slate-100 px-4 py-3">
+                  <div className="min-w-200 border-t border-slate-100 px-4 py-3">
                     <button
                       type="button"
                       onClick={loadNextPage}
