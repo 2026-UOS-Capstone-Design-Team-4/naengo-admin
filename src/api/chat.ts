@@ -1,5 +1,7 @@
 import { Recipe } from '@/components/RecipeCard';
 
+import { apiFetch } from './apiFetch';
+
 const BASE_URL = `${import.meta.env.VITE_API_URL ?? 'http://localhost:8000'}/api/v1/chat`;
 const ADMIN_BASE_URL = `${import.meta.env.VITE_API_URL ?? 'http://localhost:8000'}/api/v1/admin`;
 
@@ -19,17 +21,17 @@ export interface ChatMessage {
 }
 
 export async function getRooms(): Promise<ChatRoom[]> {
-  const response = await fetch(`${BASE_URL}/rooms`);
+  const response = await apiFetch(`${BASE_URL}/rooms`);
   return response.json();
 }
 
 export async function getRoomMessages(roomId: number): Promise<ChatMessage[]> {
-  const response = await fetch(`${BASE_URL}/rooms/${roomId}`);
+  const response = await apiFetch(`${BASE_URL}/rooms/${roomId}`);
   return response.json();
 }
 
 export async function deleteAdminChatRoom(roomId: number): Promise<void> {
-  const response = await fetch(`${ADMIN_BASE_URL}/chat-rooms/${roomId}`, {
+  const response = await apiFetch(`${ADMIN_BASE_URL}/chat-rooms/${roomId}`, {
     method: 'DELETE',
   });
 
@@ -95,7 +97,7 @@ export async function createRoomAndChat(
   callbacks: ChatCallbacks,
   image?: string,
 ): Promise<void> {
-  const response = await fetch(`${BASE_URL}/rooms`, {
+  const response = await apiFetch(`${BASE_URL}/rooms`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ prompt, image }),
@@ -109,7 +111,7 @@ export async function chatInRoom(
   callbacks: ChatCallbacks,
   image?: string,
 ): Promise<void> {
-  const response = await fetch(`${BASE_URL}/rooms/${roomId}`, {
+  const response = await apiFetch(`${BASE_URL}/rooms/${roomId}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ prompt, image }),
