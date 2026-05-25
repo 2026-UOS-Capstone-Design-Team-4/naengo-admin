@@ -1,11 +1,14 @@
 import {
   ChefHat,
   ClipboardList,
+  LogOut,
   type LucideIcon,
   MessageCircle,
   ShieldAlert,
 } from 'lucide-react';
-import { NavLink, Outlet } from 'react-router';
+import { NavLink, Outlet, useNavigate } from 'react-router';
+
+import { useAuthStore } from '@/stores/auth';
 
 const NAV_ITEMS: Array<{ to: string; label: string; Icon: LucideIcon }> = [
   { to: '/', label: '채팅', Icon: MessageCircle },
@@ -15,6 +18,15 @@ const NAV_ITEMS: Array<{ to: string; label: string; Icon: LucideIcon }> = [
 ];
 
 export default function App() {
+  const user = useAuthStore(state => state.user);
+  const clearAuth = useAuthStore(state => state.clearAuth);
+  const navigate = useNavigate();
+
+  function handleLogout() {
+    clearAuth();
+    navigate('/login', { replace: true });
+  }
+
   return (
     <div className="flex h-screen bg-slate-100">
       <aside className="flex w-52 shrink-0 flex-col border-r border-slate-200 bg-white">
@@ -52,8 +64,21 @@ export default function App() {
             </NavLink>
           ))}
         </nav>
-        <div className="border-t border-slate-100 px-4 py-3">
-          <p className="text-[10px] text-slate-400">v0.1.0 · 내부용</p>
+        <div className="space-y-2 border-t border-slate-100 px-4 py-3">
+          <div className="min-w-0">
+            <p className="truncate text-xs font-semibold text-slate-700">
+              {user?.nickname ?? '관리자'}
+            </p>
+            <p className="text-[10px] text-slate-400">v0.1.0 · 내부용</p>
+          </div>
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="flex h-8 w-full items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-800"
+          >
+            <LogOut size={13} />
+            로그아웃
+          </button>
         </div>
       </aside>
 
