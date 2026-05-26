@@ -2,8 +2,10 @@ import { Recipe } from '@/components/RecipeCard';
 
 import { apiFetch } from './apiFetch';
 
-const BASE_URL = `${import.meta.env.VITE_API_URL ?? 'http://localhost:8000'}/api/v1/chat`;
-const ADMIN_BASE_URL = `${import.meta.env.VITE_API_URL ?? 'http://localhost:8000'}/api/v1/admin`;
+const API_BASE_URL = import.meta.env.VITE_API_URL ?? '';
+
+const BASE_URL = `${API_BASE_URL}/api/v1/chat`;
+const ADMIN_BASE_URL = `${API_BASE_URL}/api/v1/admin`;
 
 export interface ChatRoom {
   room_id: number;
