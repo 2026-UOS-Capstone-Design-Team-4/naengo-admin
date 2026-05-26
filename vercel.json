@@ -2,7 +2,7 @@
   "rewrites": [
     {
       "source": "/auth-api/:path*",
-      "destination": "http://naengo-api-server-alb-176175450.ap-northeast-2.elb.amazonaws.com/api/v1/:path*"
+      "destination": "https://api.naengo.com/api/v1/:path*"
     },
     {
       "source": "/api/:path*",
