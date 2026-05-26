@@ -9,10 +9,13 @@ export default defineConfig({
   server: {
     proxy: {
       '/auth-api': {
-        target:
-          'http://naengo-api-server-alb-176175450.ap-northeast-2.elb.amazonaws.com',
+        target: 'https://api.naengo.com',
         changeOrigin: true,
         rewrite: path => path.replace(/^\/auth-api/, '/api/v1'),
+      },
+      '/api': {
+        target: 'http://3.34.187.42:8000',
+        changeOrigin: true,
       },
     },
     watch: {
