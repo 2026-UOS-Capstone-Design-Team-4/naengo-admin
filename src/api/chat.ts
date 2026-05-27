@@ -5,6 +5,7 @@ import { apiFetch } from './apiFetch';
 const API_BASE_URL = import.meta.env.VITE_API_URL ?? '';
 
 const BASE_URL = `${API_BASE_URL}/api/v1/chat`;
+const GUEST_CHAT_URL = `${API_BASE_URL}/api/v1/guest/chat`;
 const ADMIN_BASE_URL = `${API_BASE_URL}/api/v1/admin`;
 
 export interface ChatRoom {
@@ -20,6 +21,12 @@ export interface ChatMessage {
   content: string;
   recipes: Recipe[] | null;
   created_at: string;
+}
+
+export interface GuestHistoryMessage {
+  role: 'user' | 'assistant';
+  content: string;
+  image?: string | null;
 }
 
 export async function getRooms(): Promise<ChatRoom[]> {
@@ -46,7 +53,7 @@ interface ChatCallbacks {
   onRoom?: (roomId: number) => void;
   onMessage: (chunk: string) => void;
   onRecipes: (recipes: Recipe[]) => void;
-  onDone?: (messageId: number, recipeIds: number[]) => void;
+  onDone?: (messageId: number | null, recipeIds: number[]) => void;
   onError?: (code: string, message: string) => void;
 }
 
@@ -84,8 +91,8 @@ async function parseStream(
         } else if (currentEvent === 'error') {
           const parsed = JSON.parse(data);
           callbacks.onError?.(
-            parsed.code ?? 'UNKNOWN',
-            parsed.message ?? '오류가 발생했습니다.',
+            parsed.error?.code ?? parsed.code ?? 'UNKNOWN',
+            parsed.error?.message ?? parsed.message ?? '오류가 발생했습니다.',
           );
         }
         currentEvent = '';
@@ -104,6 +111,25 @@ export async function createRoomAndChat(
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ prompt, image }),
   });
+  if (response.body) await parseStream(response.body, callbacks);
+}
+
+export async function guestChat(
+  prompt: string,
+  callbacks: ChatCallbacks,
+  history: GuestHistoryMessage[],
+  image?: string,
+): Promise<void> {
+  const response = await fetch(GUEST_CHAT_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ prompt, image, history }),
+  });
+
+  if (!response.ok) {
+    throw new Error('게스트 채팅 요청에 실패했습니다.');
+  }
+
   if (response.body) await parseStream(response.body, callbacks);
 }
 
