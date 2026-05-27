@@ -8,9 +8,12 @@ import {
   deleteAdminChatRoom,
   getRoomMessages,
   getRooms,
+  guestChat,
+  type GuestHistoryMessage,
 } from '@/api/chat';
 import { MarkdownText } from '@/components/MarkdownText';
 import { Recipe, RecipeCard } from '@/components/RecipeCard';
+import { useAuthStore } from '@/stores/auth';
 
 interface ChatPart {
   text: string;
@@ -23,6 +26,19 @@ interface ChatContent {
   recipes?: Recipe[];
 }
 
+function toGuestHistory(history: ChatContent[]): GuestHistoryMessage[] {
+  return history
+    .map(
+      (message): GuestHistoryMessage => ({
+        role: message.role === 'user' ? 'user' : 'assistant',
+        content: message.parts.map(part => part.text).join(''),
+        image: message.role === 'user' ? message.image : undefined,
+      }),
+    )
+    .filter(message => message.content.trim() || message.image)
+    .slice(-20);
+}
+
 export default function ChatPage() {
   const [prompt, setPrompt] = useState('');
   const [image, setImage] = useState<string | null>(null);
@@ -33,10 +49,17 @@ export default function ChatPage() {
   const [rooms, setRooms] = useState<ChatRoom[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const accessToken = useAuthStore(state => state.accessToken);
+  const user = useAuthStore(state => state.user);
+  const hasHydrated = useAuthStore(state => state.hasHydrated);
+  const isAuthenticated = Boolean(accessToken && user?.role === 'ADMIN');
 
   useEffect(() => {
+    if (!hasHydrated) return;
+    if (!isAuthenticated) return;
+
     getRooms().then(setRooms).catch(console.error);
-  }, []);
+  }, [hasHydrated, isAuthenticated]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -45,7 +68,7 @@ export default function ChatPage() {
   }, [history]);
 
   const handleSelectRoom = async (room: ChatRoom) => {
-    if (isLoading) return;
+    if (isLoading || !isAuthenticated) return;
     setRoomId(room.room_id);
     setHistory([]);
     try {
@@ -75,7 +98,7 @@ export default function ChatPage() {
     room: ChatRoom,
   ) => {
     event.stopPropagation();
-    if (isLoading || deletingRoomId !== null) return;
+    if (isLoading || deletingRoomId !== null || !isAuthenticated) return;
     const confirmed = window.confirm(
       `"${room.title}" 채팅방을 DB에서 완전히 삭제할까요?`,
     );
@@ -107,11 +130,12 @@ export default function ChatPage() {
   };
 
   const handleSend = async () => {
-    if ((!prompt.trim() && !image) || isLoading) return;
+    if ((!prompt.trim() && !image) || isLoading || !hasHydrated) return;
 
     setIsLoading(true);
     const userPrompt = prompt;
     const userImage = image;
+    const guestHistory = toGuestHistory(history);
     setPrompt('');
     setImage(null);
 
@@ -174,7 +198,14 @@ export default function ChatPage() {
         },
       };
 
-      if (roomId === null) {
+      if (!isAuthenticated) {
+        await guestChat(
+          userPrompt,
+          callbacks,
+          guestHistory,
+          userImage ?? undefined,
+        );
+      } else if (roomId === null) {
         await createRoomAndChat(userPrompt, callbacks, userImage ?? undefined);
       } else {
         await chatInRoom(roomId, userPrompt, callbacks, userImage ?? undefined);
@@ -197,41 +228,46 @@ export default function ChatPage() {
             className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-(--color-main) px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-(--color-main-ui) disabled:opacity-50"
             disabled={isLoading}
           >
-            <Plus size={15} />
-            새 채팅
+            <Plus size={15} />새 채팅
           </button>
         </div>
         <div className="flex-1 overflow-y-auto px-2 pb-2">
-          {rooms.map(room => (
-            <div
-              key={room.room_id}
-              className={`group flex w-full items-center gap-2 rounded-xl pr-2 text-sm transition-colors ${
-                roomId === room.room_id
-                  ? 'bg-(--color-light) font-semibold'
-                  : 'hover:bg-(--color-lightest)'
-              }`}
-            >
-              <button
-                type="button"
-                onClick={() => handleSelectRoom(room)}
-                className="min-w-0 flex-1 px-3 py-2.5 text-left"
+          {!isAuthenticated ? (
+            <p className="px-3 py-4 text-center text-xs text-(--color-muted)">
+              게스트 채팅은 이 브라우저 화면에서만 유지됩니다
+            </p>
+          ) : (
+            rooms.map(room => (
+              <div
+                key={room.room_id}
+                className={`group flex w-full items-center gap-2 rounded-xl pr-2 text-sm transition-colors ${
+                  roomId === room.room_id
+                    ? 'bg-(--color-light) font-semibold'
+                    : 'hover:bg-(--color-lightest)'
+                }`}
               >
-                <span className="block truncate">{room.title}</span>
-                <span className="mt-0.5 block text-xs text-(--color-muted)">
-                  {new Date(room.updated_at).toLocaleDateString('ko-KR')}
-                </span>
-              </button>
-              <button
-                type="button"
-                onClick={event => handleDeleteRoom(event, room)}
-                disabled={deletingRoomId === room.room_id}
-                className="shrink-0 rounded-md px-2 py-1 text-xs font-semibold text-red-500 opacity-0 transition-opacity hover:bg-red-50 disabled:text-(--color-muted) group-hover:opacity-100 group-focus-within:opacity-100"
-              >
-                {deletingRoomId === room.room_id ? '삭제 중' : '삭제'}
-              </button>
-            </div>
-          ))}
-          {rooms.length === 0 && (
+                <button
+                  type="button"
+                  onClick={() => handleSelectRoom(room)}
+                  className="min-w-0 flex-1 px-3 py-2.5 text-left"
+                >
+                  <span className="block truncate">{room.title}</span>
+                  <span className="mt-0.5 block text-xs text-(--color-muted)">
+                    {new Date(room.updated_at).toLocaleDateString('ko-KR')}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={event => handleDeleteRoom(event, room)}
+                  disabled={deletingRoomId === room.room_id}
+                  className="shrink-0 rounded-md px-2 py-1 text-xs font-semibold text-red-500 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 hover:bg-red-50 disabled:text-(--color-muted)"
+                >
+                  {deletingRoomId === room.room_id ? '삭제 중' : '삭제'}
+                </button>
+              </div>
+            ))
+          )}
+          {isAuthenticated && rooms.length === 0 && (
             <p className="px-3 py-4 text-center text-xs text-(--color-muted)">
               채팅 내역이 없습니다
             </p>
@@ -251,8 +287,12 @@ export default function ChatPage() {
                 🍳
               </div>
               <div className="text-center">
-                <p className="font-semibold text-slate-700">냉장고 속 재료를 알려주세요</p>
-                <p className="mt-1 text-sm text-(--color-muted)">재료를 입력하면 딱 맞는 레시피를 추천해드릴게요!</p>
+                <p className="font-semibold text-slate-700">
+                  냉장고 속 재료를 알려주세요
+                </p>
+                <p className="mt-1 text-sm text-(--color-muted)">
+                  재료를 입력하면 딱 맞는 레시피를 추천해드릴게요!
+                </p>
               </div>
             </div>
           )}
@@ -301,15 +341,24 @@ export default function ChatPage() {
           {isLoading && history[history.length - 1]?.role !== 'model' && (
             <div className="flex justify-start">
               <div className="flex items-center gap-1 rounded-2xl rounded-tl-sm bg-(--color-light) px-4 py-3">
-                <span className="h-2 w-2 animate-bounce rounded-full bg-(--color-main)" style={{ animationDelay: '0ms' }} />
-                <span className="h-2 w-2 animate-bounce rounded-full bg-(--color-main)" style={{ animationDelay: '150ms' }} />
-                <span className="h-2 w-2 animate-bounce rounded-full bg-(--color-main)" style={{ animationDelay: '300ms' }} />
+                <span
+                  className="h-2 w-2 animate-bounce rounded-full bg-(--color-main)"
+                  style={{ animationDelay: '0ms' }}
+                />
+                <span
+                  className="h-2 w-2 animate-bounce rounded-full bg-(--color-main)"
+                  style={{ animationDelay: '150ms' }}
+                />
+                <span
+                  className="h-2 w-2 animate-bounce rounded-full bg-(--color-main)"
+                  style={{ animationDelay: '300ms' }}
+                />
               </div>
             </div>
           )}
         </div>
 
-        <div className="border-t border-(--color-light) bg-white px-4 pb-4 pt-3">
+        <div className="border-t border-(--color-light) bg-white px-4 pt-3 pb-4">
           {image && (
             <div className="mb-2 flex items-center gap-2">
               <img
@@ -325,7 +374,7 @@ export default function ChatPage() {
               </button>
             </div>
           )}
-          <div className="flex items-end gap-2 rounded-2xl border border-(--color-light) bg-(--color-lightest) px-3 py-2 focus-within:border-(--color-main) focus-within:bg-white transition-colors">
+          <div className="flex items-end gap-2 rounded-2xl border border-(--color-light) bg-(--color-lightest) px-3 py-2 transition-colors focus-within:border-(--color-main) focus-within:bg-white">
             <input
               ref={fileInputRef}
               type="file"
@@ -367,7 +416,9 @@ export default function ChatPage() {
               <Send size={15} />
             </button>
           </div>
-          <p className="mt-1.5 text-center text-[10px] text-(--color-muted)">Enter로 전송, Shift+Enter로 줄바꿈</p>
+          <p className="mt-1.5 text-center text-[10px] text-(--color-muted)">
+            Enter로 전송, Shift+Enter로 줄바꿈
+          </p>
         </div>
       </div>
     </div>
