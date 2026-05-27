@@ -8,11 +8,13 @@ export interface RecipeStep {
 }
 
 export interface IngredientItem {
+  group_name?: string | null;
   name: string;
-  amount: string;
-  unit: string;
-  type: string;
+  amount?: string | null;
+  unit?: string | null;
+  type?: string | null;
   note?: string | null;
+  raw_text?: string | null;
 }
 
 export interface UserRecipeIngredient {
@@ -53,7 +55,6 @@ export interface Recipe {
   title: string;
   description: string;
   ingredients: IngredientItem[];
-  ingredients_raw: string;
   steps: RecipeStep[];
   servings: number;
   cooking_time_minutes: number;
@@ -63,8 +64,10 @@ export interface Recipe {
   tags: string[];
   tips: string[];
   summary?: string | null;
+  source_url?: string | null;
   video_url?: string | null;
   image_url?: string | null;
+  main_image_url?: string | null;
   is_active?: boolean;
   author_type?: 'ADMIN' | 'USER' | 'SOURCE' | string;
   created_at?: string | null;
@@ -122,11 +125,49 @@ function getYoutubeThumbnail(url: string): string | null {
   return match ? `https://img.youtube.com/vi/${match[1]}/hqdefault.jpg` : null;
 }
 
+function getIngredientText(ingredient: IngredientItem): string {
+  if (ingredient.raw_text?.trim()) {
+    return ingredient.raw_text.trim();
+  }
+
+  return [
+    ingredient.name,
+    [ingredient.amount, ingredient.unit].filter(Boolean).join(''),
+    ingredient.note,
+  ]
+    .filter(Boolean)
+    .join(' ');
+}
+
+interface IngredientGroup {
+  groupName: string | null;
+  ingredients: string[];
+}
+
+function getIngredientGroups(ingredients: IngredientItem[]): IngredientGroup[] {
+  const groups = new Map<string, IngredientGroup>();
+
+  ingredients.forEach(ingredient => {
+    const ingredientText = getIngredientText(ingredient);
+    if (!ingredientText) return;
+
+    const groupName = ingredient.group_name?.trim() || null;
+    const groupKey = groupName ?? '';
+    const group = groups.get(groupKey) ?? { groupName, ingredients: [] };
+    group.ingredients.push(ingredientText);
+    groups.set(groupKey, group);
+  });
+
+  return Array.from(groups.values());
+}
+
 export function RecipeCard({ recipe }: { recipe: Recipe }) {
   const [open, setOpen] = useState(false);
-  const coverImage = recipe.video_url
-    ? getYoutubeThumbnail(recipe.video_url)
-    : recipe.image_url;
+  const coverImage =
+    (recipe.video_url ? getYoutubeThumbnail(recipe.video_url) : null) ??
+    recipe.main_image_url ??
+    recipe.image_url;
+  const ingredientGroups = getIngredientGroups(recipe.ingredients);
 
   return (
     <article className="rounded-lg border border-(--color-light) bg-white shadow-sm">
@@ -186,7 +227,31 @@ export function RecipeCard({ recipe }: { recipe: Recipe }) {
 
           <section>
             <h4 className="mb-1 font-semibold text-(--color-main)">재료</h4>
-            <p className="text-(--color-gray)">{recipe.ingredients_raw}</p>
+            {ingredientGroups.length > 0 ? (
+              <div className="space-y-3">
+                {ingredientGroups.map(group => (
+                  <div key={group.groupName ?? 'default'}>
+                    {group.groupName && (
+                      <p className="mb-1 text-xs font-semibold text-(--color-gray)">
+                        {group.groupName}
+                      </p>
+                    )}
+                    <ul className="grid gap-1 text-(--color-gray) sm:grid-cols-2">
+                      {group.ingredients.map((ingredient, index) => (
+                        <li
+                          key={`${ingredient}-${index}`}
+                          className="rounded-md bg-(--color-lightest) px-2 py-1"
+                        >
+                          {ingredient}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-(--color-gray)">재료 정보가 없습니다.</p>
+            )}
           </section>
 
           {recipe.steps.length > 0 && (
@@ -220,6 +285,17 @@ export function RecipeCard({ recipe }: { recipe: Recipe }) {
               className="inline-flex text-(--color-main-ui) underline"
             >
               원본 영상 보기
+            </a>
+          )}
+
+          {recipe.source_url && (
+            <a
+              href={recipe.source_url}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex max-w-full break-all text-(--color-main-ui) underline"
+            >
+              {recipe.source_url}
             </a>
           )}
         </div>
