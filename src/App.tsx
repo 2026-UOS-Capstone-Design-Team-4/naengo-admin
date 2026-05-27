@@ -1,6 +1,7 @@
 import {
   ChefHat,
   ClipboardList,
+  LogIn,
   LogOut,
   type LucideIcon,
   MessageCircle,
@@ -19,12 +20,19 @@ const NAV_ITEMS: Array<{ to: string; label: string; Icon: LucideIcon }> = [
 
 export default function App() {
   const user = useAuthStore(state => state.user);
+  const accessToken = useAuthStore(state => state.accessToken);
   const clearAuth = useAuthStore(state => state.clearAuth);
   const navigate = useNavigate();
+  const isAdmin = Boolean(accessToken && user?.role === 'ADMIN');
+  const visibleNavItems = isAdmin ? NAV_ITEMS : NAV_ITEMS.slice(0, 1);
 
   function handleLogout() {
     clearAuth();
     navigate('/login', { replace: true });
+  }
+
+  function handleLogin() {
+    navigate('/login?next=/');
   }
 
   return (
@@ -46,7 +54,7 @@ export default function App() {
           </div>
         </div>
         <nav className="flex flex-1 flex-col gap-0.5 p-2">
-          {NAV_ITEMS.map(({ to, label, Icon }) => (
+          {visibleNavItems.map(({ to, label, Icon }) => (
             <NavLink
               key={to}
               to={to}
@@ -67,18 +75,31 @@ export default function App() {
         <div className="space-y-2 border-t border-slate-100 px-4 py-3">
           <div className="min-w-0">
             <p className="truncate text-xs font-semibold text-slate-700">
-              {user?.nickname ?? '관리자'}
+              {user?.nickname ?? '게스트'}
             </p>
-            <p className="text-[10px] text-slate-400">v0.1.0 · 내부용</p>
+            <p className="text-[10px] text-slate-400">
+              {isAdmin ? 'v0.1.0 · 내부용' : '로그인 없이 채팅 가능'}
+            </p>
           </div>
-          <button
-            type="button"
-            onClick={handleLogout}
-            className="flex h-8 w-full items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-800"
-          >
-            <LogOut size={13} />
-            로그아웃
-          </button>
+          {isAdmin ? (
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="flex h-8 w-full items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-800"
+            >
+              <LogOut size={13} />
+              로그아웃
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={handleLogin}
+              className="flex h-8 w-full items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-800"
+            >
+              <LogIn size={13} />
+              로그인
+            </button>
+          )}
         </div>
       </aside>
 
