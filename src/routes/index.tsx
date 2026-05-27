@@ -13,12 +13,12 @@ export const router = createBrowserRouter([
   { path: 'login', element: <LoginPage /> },
   { path: 'signup', element: <SignupPage /> },
   {
-    element: <RequireAuth />,
+    element: <App />,
     children: [
+      { index: true, element: <ChatPage /> },
       {
-        element: <App />,
+        element: <RequireAuth />,
         children: [
-          { index: true, element: <ChatPage /> },
           { path: 'admin', element: <Navigate to="/admin/recipes" replace /> },
           { path: 'admin/recipes', element: <AdminPage /> },
           { path: 'admin/user-recipes', element: <RecipesPage /> },
