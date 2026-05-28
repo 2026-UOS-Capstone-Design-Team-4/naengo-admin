@@ -52,7 +52,9 @@ export default function ChatPage() {
   const accessToken = useAuthStore(state => state.accessToken);
   const user = useAuthStore(state => state.user);
   const hasHydrated = useAuthStore(state => state.hasHydrated);
-  const isAuthenticated = Boolean(accessToken && user?.role === 'ADMIN');
+  const isDev = import.meta.env.DEV;
+  const isAuthenticated =
+    isDev || Boolean(accessToken && user?.role === 'ADMIN');
 
   useEffect(() => {
     if (!hasHydrated) return;

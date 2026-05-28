@@ -23,7 +23,8 @@ export default function App() {
   const accessToken = useAuthStore(state => state.accessToken);
   const clearAuth = useAuthStore(state => state.clearAuth);
   const navigate = useNavigate();
-  const isAdmin = Boolean(accessToken && user?.role === 'ADMIN');
+  const isDev = import.meta.env.DEV;
+  const isAdmin = isDev || Boolean(accessToken && user?.role === 'ADMIN');
   const visibleNavItems = isAdmin ? NAV_ITEMS : NAV_ITEMS.slice(0, 1);
 
   function handleLogout() {
@@ -75,7 +76,7 @@ export default function App() {
         <div className="space-y-2 border-t border-slate-100 px-4 py-3">
           <div className="min-w-0">
             <p className="truncate text-xs font-semibold text-slate-700">
-              {user?.nickname ?? '게스트'}
+              {user?.nickname ?? (isDev ? '개발 관리자' : '게스트')}
             </p>
             <p className="text-[10px] text-slate-400">
               {isAdmin ? 'v0.1.0 · 내부용' : '로그인 없이 채팅 가능'}

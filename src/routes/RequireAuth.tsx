@@ -3,10 +3,15 @@ import { Navigate, Outlet, useLocation } from 'react-router';
 import { useAuthStore } from '@/stores/auth';
 
 export default function RequireAuth() {
+  const isDev = import.meta.env.DEV;
   const accessToken = useAuthStore(state => state.accessToken);
   const user = useAuthStore(state => state.user);
   const hasHydrated = useAuthStore(state => state.hasHydrated);
   const location = useLocation();
+
+  if (isDev) {
+    return <Outlet />;
+  }
 
   if (!hasHydrated) {
     return (

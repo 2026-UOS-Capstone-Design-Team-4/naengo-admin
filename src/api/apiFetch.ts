@@ -30,7 +30,7 @@ export async function apiFetch(
 
   if (!response.ok) {
     const errorBody = await getApiErrorBody(response);
-    if (errorBody?.error?.code === 'UNAUTHENTICATED') {
+    if (errorBody?.error?.code === 'UNAUTHENTICATED' && !import.meta.env.DEV) {
       redirectToLogin();
     }
   }
