@@ -19,15 +19,9 @@
 npm install
 ```
 
-### 2. 환경 변수 설정
+### 2. API 프록시 설정
 
-`.env` 파일을 생성하고 아래 내용을 입력하세요.
-
-```env
-VITE_API_URL=http://localhost:8000
-```
-
-미설정 시 기본값 `http://localhost:8000`으로 동작합니다.
+API 요청은 상대 경로 `/api`를 사용합니다. 개발 환경에서는 Vite proxy가 `/api` 요청을 로컬 백엔드로 전달하고, Vercel 배포 환경에서는 `vercel.json`의 rewrite 설정이 백엔드로 전달합니다.
 
 ### 3. 개발 서버 실행
 

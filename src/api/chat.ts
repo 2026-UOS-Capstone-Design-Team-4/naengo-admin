@@ -2,11 +2,9 @@ import { Recipe } from '@/components/RecipeCard';
 
 import { apiFetch } from './apiFetch';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL ?? '';
-
-const BASE_URL = `${API_BASE_URL}/api/v1/chat`;
-const GUEST_CHAT_URL = `${API_BASE_URL}/api/v1/guest/chat`;
-const ADMIN_BASE_URL = `${API_BASE_URL}/api/v1/admin`;
+const BASE_URL = '/api/v1/chat';
+const GUEST_CHAT_URL = '/api/v1/guest/chat';
+const ADMIN_BASE_URL = '/api/v1/admin';
 
 export interface ChatRoom {
   room_id: number;
@@ -31,6 +29,9 @@ export interface GuestHistoryMessage {
 
 export async function getRooms(): Promise<ChatRoom[]> {
   const response = await apiFetch(`${BASE_URL}/rooms`);
+  if (!response.ok) {
+    return [];
+  }
   return response.json();
 }
 

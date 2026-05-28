@@ -18,7 +18,7 @@ declare module 'axios' {
 }
 
 const client = axios.create({
-  baseURL: `${import.meta.env.VITE_API_URL ?? ''}/api/v1`,
+  baseURL: '/api/v1',
   headers: { 'Content-Type': 'application/json' },
 });
 
@@ -36,6 +36,7 @@ client.interceptors.response.use(
     if (
       axios.isAxiosError<ApiErrorBody>(error) &&
       error.response?.data?.error?.code === 'UNAUTHENTICATED' &&
+      !import.meta.env.DEV &&
       !error.config?.skipAuthRedirect
     ) {
       redirectToLogin();
