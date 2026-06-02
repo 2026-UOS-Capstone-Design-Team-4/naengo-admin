@@ -40,7 +40,7 @@ npm run format    # Prettier 포맷 적용
 
 ## ☁️ 배포
 
-[naengo-admin.vercel.app](https://naengo-admin.vercel.app)에 배포 중이며, `main` 브랜치에 push하면 Vercel을 통해 자동 배포됩니다.
+[ai.naengo.com](https://ai.naengo.com)에 배포 중이며, `main` 브랜치에 push하면 Vercel을 통해 자동 배포됩니다.
 
 ## 🐳 Docker로 실행
 

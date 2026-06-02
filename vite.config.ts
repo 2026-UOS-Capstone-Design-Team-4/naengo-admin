@@ -9,7 +9,7 @@ export default defineConfig({
   server: {
     proxy: {
       '/auth-api': {
-        target: 'https://api.naengo.com',
+        target: 'https://ai.naengo.com',
         changeOrigin: true,
         rewrite: path => path.replace(/^\/auth-api/, '/api/v1'),
       },

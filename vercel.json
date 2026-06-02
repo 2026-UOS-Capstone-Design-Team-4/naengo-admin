@@ -2,11 +2,11 @@
   "rewrites": [
     {
       "source": "/auth-api/:path*",
-      "destination": "https://api.naengo.com/api/v1/:path*"
+      "destination": "https://ai.naengo.com/api/v1/:path*"
     },
     {
       "source": "/api/:path*",
-      "destination": "http://3.34.187.42:8000/api/:path*"
+      "destination": "https://ai.naengo.com/api/:path*"
     },
     {
       "source": "/(.*)",
