@@ -7,3 +7,11 @@ dist
 eslint.config.js
 README.md
 Dockerfile
+docker-compose*.yml
+.vscode
+.claude
+.omc
+CLAUDE.md
+AGENTS.md
+*.log
+.env*
