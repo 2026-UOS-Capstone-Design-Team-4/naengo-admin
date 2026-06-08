@@ -17,6 +17,7 @@ export interface ChatMessage {
   message_id: number;
   role: string;
   content: string;
+  image_url: string | null;
   recipes: Recipe[] | null;
   created_at: string;
 }

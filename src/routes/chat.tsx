@@ -79,6 +79,7 @@ export default function ChatPage() {
         messages.map(m => ({
           role: m.role as 'user' | 'model',
           parts: [{ text: m.content }],
+          image: m.image_url ?? undefined,
           recipes: m.recipes ?? undefined,
         })),
       );
