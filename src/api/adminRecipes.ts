@@ -91,6 +91,7 @@ export interface AdminRecipeNutrition {
   updated_at?: string | null;
 }
 
+
 export interface AdminRecipeClassification {
   cuisine_type?: string | null;
   dish_type?: string | null;

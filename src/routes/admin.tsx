@@ -71,6 +71,32 @@ function difficultyLabel(value?: string | null) {
   return value || '-';
 }
 
+function visibilityLabel(value?: string | null) {
+  if (value === 'PUBLIC') return '공개';
+  if (value === 'ADMIN_ONLY') return '관리자 전용';
+  return value || '-';
+}
+
+function authorLabel(value?: string | null) {
+  if (value === 'ADMIN') return '관리자';
+  if (value === 'USER') return '사용자';
+  if (value === 'SOURCE') return '수집 원본';
+  return value || '-';
+}
+
+function formatPercent(value?: number | null) {
+  if (value == null) return '-';
+  return `${Math.round(value * 100)}%`;
+}
+
+function qualityScore(recipe: AdminRecipeListItem) {
+  return [
+    recipe.has_nutrition,
+    recipe.has_classification,
+    recipe.has_embedding,
+  ].filter(Boolean).length;
+}
+
 function SelectFilter({
   label,
   value,
@@ -100,6 +126,29 @@ function SelectFilter({
   );
 }
 
+function Pill({
+  label,
+  tone = 'neutral',
+}: {
+  label: string;
+  tone?: 'main' | 'neutral' | 'warning';
+}) {
+  const className =
+    tone === 'main'
+      ? 'bg-(--color-lighter) text-(--color-main-ui) ring-(--color-light)'
+      : tone === 'warning'
+        ? 'bg-amber-50 text-amber-700 ring-amber-200'
+        : 'bg-slate-100 text-slate-600 ring-slate-200';
+
+  return (
+    <span
+      className={`rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${className}`}
+    >
+      {label}
+    </span>
+  );
+}
+
 function Flag({ active, label }: { active: boolean; label: string }) {
   return (
     <span
@@ -111,6 +160,16 @@ function Flag({ active, label }: { active: boolean; label: string }) {
     >
       {label}
     </span>
+  );
+}
+
+function QualityFlags({ recipe }: { recipe: AdminRecipeListItem }) {
+  return (
+    <div className="flex flex-wrap gap-1">
+      <Flag active={recipe.has_nutrition} label="영양" />
+      <Flag active={recipe.has_classification} label="분류" />
+      <Flag active={recipe.has_embedding} label="임베딩" />
+    </div>
   );
 }
 
@@ -127,7 +186,7 @@ function RecipeRow({
     <button
       type="button"
       onClick={onClick}
-      className={`grid w-full min-w-200 grid-cols-[5rem_1fr_6rem_7rem_7rem_6rem_7rem] items-center gap-3 border-b border-slate-100 px-4 py-3 text-left text-sm transition-colors hover:bg-slate-50 ${
+      className={`grid w-full min-w-[78rem] grid-cols-[5rem_1fr_6rem_6rem_6rem_7rem_8rem_7rem_7rem] items-center gap-3 border-b border-slate-100 px-4 py-3 text-left text-sm transition-colors hover:bg-slate-50 ${
         selected
           ? 'border-l-2 border-l-(--color-main) bg-(--color-lighter)'
           : 'bg-white'
@@ -141,7 +200,8 @@ function RecipeRow({
           {recipe.title}
         </span>
         <span className="mt-0.5 block truncate text-xs text-slate-500">
-          {sourceLabel(recipe.source_site)} · {recipe.visibility}
+          {sourceLabel(recipe.source_site)} ·{' '}
+          {visibilityLabel(recipe.visibility)}
         </span>
       </span>
       <span className="text-xs text-slate-600">
@@ -157,6 +217,10 @@ function RecipeRow({
         active={recipe.is_active}
         label={recipe.is_active ? '노출' : '숨김'}
       />
+      <QualityFlags recipe={recipe} />
+      <span className="text-xs text-slate-600">
+        좋아요 {recipe.likes_count} · 스크랩 {recipe.scrap_count}
+      </span>
       <span className="text-xs text-slate-500">
         {formatDate(recipe.created_at)}
       </span>
@@ -181,6 +245,29 @@ function Metric({
   );
 }
 
+function TagGroup({
+  label,
+  values,
+  tone = 'neutral',
+}: {
+  label: string;
+  values: string[];
+  tone?: 'main' | 'neutral' | 'warning';
+}) {
+  if (values.length === 0) return null;
+
+  return (
+    <div>
+      <p className="mb-1 text-xs font-bold text-slate-500">{label}</p>
+      <div className="flex flex-wrap gap-1">
+        {values.map(value => (
+          <Pill key={`${label}-${value}`} label={value} tone={tone} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function DetailPanel({ detail }: { detail: AdminRecipeDetail | null }) {
   const primaryImage = detail?.main_image_url;
 
@@ -195,6 +282,17 @@ function DetailPanel({ detail }: { detail: AdminRecipeDetail | null }) {
   const categories = detail.labels.filter(
     label => label.label_type === 'CATEGORY',
   );
+  const labelGroups = Array.from(
+    new Set(
+      detail.labels
+        .map(label => label.label_type)
+        .filter(labelType => labelType !== 'CATEGORY'),
+    ),
+  ).map(labelType => ({
+    labelType,
+    labels: detail.labels.filter(label => label.label_type === labelType),
+  }));
+  const classification = detail.classification;
 
   return (
     <aside className="flex h-full min-h-0 min-w-0 flex-col border-l border-slate-200 bg-white">
@@ -208,10 +306,9 @@ function DetailPanel({ detail }: { detail: AdminRecipeDetail | null }) {
               {detail.title}
             </h2>
           </div>
-          <div className="flex shrink-0 gap-1">
-            <Flag active={detail.has_nutrition} label="영양" />
-            <Flag active={detail.has_classification} label="분류" />
-            <Flag active={detail.has_embedding} label="임베딩" />
+          <div className="flex shrink-0 flex-col items-end gap-1.5">
+            <Pill label={visibilityLabel(detail.visibility)} tone="main" />
+            <QualityFlags recipe={detail} />
           </div>
         </div>
         {detail.source_url && (
@@ -235,7 +332,7 @@ function DetailPanel({ detail }: { detail: AdminRecipeDetail | null }) {
           />
         )}
 
-        <section className="grid grid-cols-2 gap-2 xl:grid-cols-4">
+<section className="grid grid-cols-2 gap-2 xl:grid-cols-3">
           <Metric label="인분" value={detail.servings} />
           <Metric
             label="조리 시간"
@@ -243,6 +340,11 @@ function DetailPanel({ detail }: { detail: AdminRecipeDetail | null }) {
           />
           <Metric label="kcal/인분" value={detail.kcal_per_serving} />
           <Metric label="난이도" value={difficultyLabel(detail.difficulty)} />
+          <Metric label="좋아요" value={detail.stats.likes_count} />
+          <Metric label="스크랩" value={detail.stats.scrap_count} />
+          <Metric label="작성 주체" value={authorLabel(detail.author_type)} />
+          <Metric label="품질 점수" value={`${qualityScore(detail)}/3`} />
+          <Metric label="수정일" value={formatDate(detail.updated_at)} />
         </section>
 
         <section>
@@ -267,6 +369,97 @@ function DetailPanel({ detail }: { detail: AdminRecipeDetail | null }) {
             </div>
           </section>
         )}
+
+        {labelGroups.length > 0 && (
+          <section>
+            <h3 className="mb-2 text-sm font-bold text-slate-950">라벨</h3>
+            <div className="space-y-3">
+              {labelGroups.map(group => (
+                <TagGroup
+                  key={group.labelType}
+                  label={group.labelType}
+                  values={group.labels.map(label => label.label_value)}
+                  tone={group.labelType === 'CATEGORY' ? 'main' : 'neutral'}
+                />
+              ))}
+            </div>
+          </section>
+        )}
+
+        {classification && (
+          <section>
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <h3 className="text-sm font-bold text-slate-950">분류 정보</h3>
+              <span className="text-xs font-semibold text-slate-500">
+                {classification.classification_source} · 신뢰도{' '}
+                {formatPercent(classification.confidence_score)}
+              </span>
+            </div>
+            <div className="space-y-3 rounded border border-slate-200 px-3 py-3">
+              <div className="grid grid-cols-2 gap-2">
+                <Metric label="Cuisine" value={classification.cuisine_type} />
+                <Metric label="Dish" value={classification.dish_type} />
+              </div>
+              <TagGroup
+                label="조리법"
+                values={classification.cooking_methods}
+                tone="main"
+              />
+              <TagGroup label="식사 유형" values={classification.meal_types} />
+              <TagGroup label="상황" values={classification.situations} />
+              <TagGroup
+                label="주재료"
+                values={classification.main_ingredients}
+              />
+              <TagGroup
+                label="맛"
+                values={classification.taste_keywords}
+                tone="warning"
+              />
+              <TagGroup label="식감" values={classification.texture_keywords} />
+              <TagGroup label="식단" values={classification.diet_keywords} />
+              <TagGroup
+                label="알레르기"
+                values={classification.allergen_keywords}
+                tone="warning"
+              />
+              <TagGroup label="도구" values={classification.equipment} />
+              <TagGroup label="계절" values={classification.season} />
+              <TagGroup
+                label="분류 라벨"
+                values={classification.category_labels}
+                tone="main"
+              />
+            </div>
+          </section>
+        )}
+
+        <section>
+          <h3 className="mb-2 text-sm font-bold text-slate-950">원천 정보</h3>
+          <div className="grid grid-cols-2 gap-2">
+            <Metric label="출처" value={sourceLabel(detail.source_site)} />
+            <Metric label="원천 ID" value={detail.source_recipe_id} />
+            <Metric label="레코드 ID" value={detail.source_record_id} />
+            <Metric label="데이터셋" value={detail.source_dataset_name} />
+            <Metric label="작성자" value={detail.source_author_name} />
+            <Metric label="기관" value={detail.source_organization} />
+            <Metric label="라이선스" value={detail.source_license} />
+            <Metric
+              label="발행일"
+              value={formatDate(detail.source_published_at)}
+            />
+          </div>
+          {detail.source_license_url && (
+            <a
+              href={detail.source_license_url}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-2 block truncate text-xs font-medium text-(--color-main-ui)"
+            >
+              {detail.source_license_url}
+            </a>
+          )}
+        </section>
 
         <section>
           <h3 className="mb-2 text-sm font-bold text-slate-950">재료</h3>
@@ -568,21 +761,23 @@ export default function AdminPage() {
       <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_minmax(20rem,28rem)] overflow-hidden">
         <section className="min-w-0 overflow-hidden bg-white">
           <div className="h-full overflow-auto pb-20">
-            <div className="grid min-w-200 grid-cols-[5rem_1fr_6rem_7rem_7rem_6rem_7rem] gap-3 border-b border-slate-200 bg-slate-50 px-4 py-2 text-xs font-bold tracking-wide text-slate-500">
+            <div className="grid min-w-[78rem] grid-cols-[5rem_1fr_6rem_6rem_6rem_7rem_8rem_7rem_7rem] gap-3 border-b border-slate-200 bg-slate-50 px-4 py-2 text-xs font-bold tracking-wide text-slate-500">
               <span>번호</span>
               <span>제목</span>
               <span>시간</span>
               <span>난이도</span>
               <span>칼로리</span>
               <span>상태</span>
+              <span>품질</span>
+              <span>반응</span>
               <span>생성일</span>
             </div>
             {loading ? (
-              <div className="min-w-200">
+              <div className="min-w-[78rem]">
                 {Array.from({ length: 10 }).map((_, i) => (
                   <div
                     key={i}
-                    className="grid grid-cols-[5rem_1fr_6rem_7rem_7rem_6rem_7rem] gap-3 border-b border-slate-100 px-4 py-3"
+                    className="grid grid-cols-[5rem_1fr_6rem_6rem_6rem_7rem_8rem_7rem_7rem] gap-3 border-b border-slate-100 px-4 py-3"
                   >
                     <div className="h-4 w-10 animate-pulse rounded bg-slate-200" />
                     <div className="h-4 w-48 animate-pulse rounded bg-slate-200" />
@@ -590,6 +785,8 @@ export default function AdminPage() {
                     <div className="h-4 w-12 animate-pulse rounded bg-slate-200" />
                     <div className="h-4 w-14 animate-pulse rounded bg-slate-200" />
                     <div className="h-4 w-10 animate-pulse rounded bg-slate-200" />
+                    <div className="h-4 w-20 animate-pulse rounded bg-slate-200" />
+                    <div className="h-4 w-20 animate-pulse rounded bg-slate-200" />
                     <div className="h-4 w-20 animate-pulse rounded bg-slate-200" />
                   </div>
                 ))}
@@ -609,7 +806,7 @@ export default function AdminPage() {
                   />
                 ))}
                 {hasNext && (
-                  <div className="min-w-200 border-t border-slate-100 px-4 py-3">
+                  <div className="min-w-[78rem] border-t border-slate-100 px-4 py-3">
                     <button
                       type="button"
                       onClick={loadNextPage}
