@@ -17,26 +17,45 @@ export interface UserRecipeLabel {
 
 import client from './client';
 
+export interface PendingRecipeFilters {
+  status?: PendingRecipeStatus | '';
+  is_active?: boolean | '';
+  user_id?: number | '';
+  q?: string;
+  cursor?: string | null;
+  limit?: number;
+}
+
+export interface PendingRecipeListResponse {
+  items: PendingRecipe[];
+  next_cursor: string | null;
+  has_next: boolean;
+}
+
+function cleanParams(params: Record<string, unknown>) {
+  return Object.fromEntries(
+    Object.entries(params).filter(([, value]) => value !== '' && value != null),
+  );
+}
+
 export async function getPendingRecipes(
-  status: PendingRecipeStatus | '' = 'PENDING',
-  isActive: boolean | '' = true,
-  q?: string,
-): Promise<PendingRecipe[]> {
-  const { data } = await client.get<{ items: PendingRecipe[] }>(
+  filters: PendingRecipeFilters = {},
+): Promise<PendingRecipeListResponse> {
+  const { data } = await client.get<PendingRecipeListResponse>(
     '/admin/user-recipes',
     {
-      params: {
-        ...(status ? { status } : {}),
-        ...(isActive === '' ? {} : { is_active: isActive }),
-        ...(q ? { q } : {}),
-        limit: 100,
-      },
+      params: cleanParams({ limit: 100, ...filters }),
     },
   );
   if (!Array.isArray(data.items)) {
     throw new Error('Invalid pending recipe list response');
   }
-  return data.items;
+  return data;
+}
+
+export async function getPendingRecipe(id: number): Promise<PendingRecipe> {
+  const { data } = await client.get<PendingRecipe>(`/admin/user-recipes/${id}`);
+  return data;
 }
 
 export interface PendingRecipeUpdatePayload {
@@ -108,6 +127,7 @@ export async function updatePendingRecipe(
 }
 
 const REQUIRED_RECIPE_FIELDS = [
+  'title',
   'description',
   'ingredients',
   'steps',
@@ -120,6 +140,7 @@ const REQUIRED_RECIPE_FIELDS = [
 type RequiredRecipeField = (typeof REQUIRED_RECIPE_FIELDS)[number];
 
 const RECIPE_FIELD_LABEL: Record<RequiredRecipeField, string> = {
+  title: '제목',
   description: '설명',
   ingredients: '재료',
   steps: '조리 순서',
