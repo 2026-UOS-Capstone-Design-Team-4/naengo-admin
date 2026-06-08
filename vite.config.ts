@@ -11,7 +11,7 @@ export default defineConfig({
       '/auth-api': {
         target: 'https://api.naengo.com',
         changeOrigin: true,
-        rewrite: path => path.replace(/^\/auth-api/, '/api/v1'),
+        rewrite: path => path.replace(/^\/auth-api/, '/api'),
       },
       '/api': {
         target: 'http://host.docker.internal:8000',
